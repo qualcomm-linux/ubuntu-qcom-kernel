@@ -261,6 +261,9 @@ struct etr_buf_node {
  * @etr_buf_list: List that is used to manage allocated etr_buf.
  * @reading_node: Available buffer_node for byte-cntr reading.
  * @sysfs_ops:	Read operations for sysfs mode.
+ * @supported_cpus:	Represent the CPUs related to this TMC.
+ * @devid:	TMC variant ID inferred from the device configuration register.
+ * @desc_name:	Name to be used while creating crash interface.
  */
 struct tmc_drvdata {
 	struct clk		*atclk;
@@ -294,6 +297,9 @@ struct tmc_drvdata {
 	struct list_head        etr_buf_list;
 	struct etr_buf_node     *reading_node;
 	const struct tmc_sysfs_ops	*sysfs_ops;
+	struct cpumask		*supported_cpus;
+	u32			devid;
+	const char		*desc_name;
 };
 
 /**
