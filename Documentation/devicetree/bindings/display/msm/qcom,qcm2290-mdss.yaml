@@ -108,7 +108,6 @@ examples:
                              "cpu-cfg";
 
         iommus = <&apps_smmu 0x420 0x2>;
-        ranges;
 
         display-controller@5e01000 {
             compatible = "qcom,qcm2290-dpu";
