@@ -75,6 +75,15 @@ struct tz_cp_config {
 	u32 cp_nonpixel_size;
 };
 
+struct ubwc_config_data {
+	u32	max_channels;
+	u32	highest_bank_bit;
+	u32	bank_swzl_level;
+	u32	bank_swz2_level;
+	u32	bank_swz3_level;
+	u32	bank_spreading;
+};
+
 struct platform_inst_caps {
 	u32 min_frame_width;
 	u32 max_frame_width;
