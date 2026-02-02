@@ -13344,6 +13344,7 @@ int ath12k_mac_op_get_survey(struct ieee80211_hw *hw, int idx,
 	struct ath12k *ar;
 	struct ieee80211_supported_band *sband;
 	struct survey_info *ar_survey;
+	int orig_idx = idx;
 
 	lockdep_assert_wiphy(hw->wiphy);
 
@@ -13378,7 +13379,7 @@ int ath12k_mac_op_get_survey(struct ieee80211_hw *hw, int idx,
 		return -ENOENT;
 	}
 
-	ar_survey = &ar->survey[idx];
+	ar_survey = &ar->survey[orig_idx];
 
 	ath12k_mac_update_bss_chan_survey(ar, &sband->channels[idx]);
 
