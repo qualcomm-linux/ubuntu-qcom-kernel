@@ -41,16 +41,7 @@ properties:
     maxItems: 1
 
   power-domains:
-    items:
-      - description: TITAN TOP GDSC
-      - description: MXC or MXA voltage rail
-      - description: MMCX voltage rail
-
-  power-domain-names:
-    items:
-      - const: top
-      - const: mx
-      - const: mmcx
+    maxItems: 1
 
   vdda-0p8-supply:
     description: Phandle to a 0.8V regulator supply to a PHY.
@@ -67,7 +58,6 @@ required:
   - interrupts
   - operating-points-v2
   - power-domains
-  - power-domain-names
   - vdda-0p8-supply
   - vdda-1p2-supply
 
@@ -79,7 +69,6 @@ examples:
     #include <dt-bindings/clock/qcom,x1e80100-camcc.h>
     #include <dt-bindings/clock/qcom,x1e80100-gcc.h>
     #include <dt-bindings/phy/phy.h>
-    #include <dt-bindings/power/qcom,rpmhpd.h>
 
     csiphy@ace4000 {
         compatible = "qcom,x1e80100-csi2-phy";
@@ -99,35 +88,27 @@ examples:
 
         interrupts = <GIC_SPI 477 IRQ_TYPE_EDGE_RISING>;
 
-        power-domains = <&camcc CAM_CC_TITAN_TOP_GDSC>,
-                        <&rpmhpd RPMHPD_MX>,
-                        <&rpmhpd RPMHPD_MMCX>;
-        power-domain-names = "top",
-                             "mx",
-                             "mmcx";
+        power-domains = <&camcc CAM_CC_TITAN_TOP_GDSC>;
 
         vdda-0p8-supply = <&vreg_l2c_0p8>;
         vdda-1p2-supply = <&vreg_l1c_1p2>;
     };
 
-    csiphy_opp_table: opp-table {
+    csiphy_opp_table: opp-table-csiphy {
         compatible = "operating-points-v2";
 
         opp-300000000 {
             opp-hz = /bits/ 64 <300000000>;
-            required-opps = <&rpmhpd_opp_low_svs_d1>,
-                            <&rpmhpd_opp_low_svs_d1>;
+            required-opps = <&rpmhpd_opp_low_svs_d1>;
         };
 
         opp-400000000 {
             opp-hz = /bits/ 64 <400000000>;
-            required-opps = <&rpmhpd_opp_low_svs>,
-                            <&rpmhpd_opp_low_svs>;
+            required-opps = <&rpmhpd_opp_low_svs>;
         };
 
         opp-480000000 {
             opp-hz = /bits/ 64 <480000000>;
-            required-opps = <&rpmhpd_opp_low_svs>,
-                            <&rpmhpd_opp_low_svs>;
+            required-opps = <&rpmhpd_opp_low_svs>;
         };
     };
