@@ -256,14 +256,6 @@ properties:
                       minItems: 1
                       maxItems: 4
 
-patternProperties:
-  "^phy@[0-9a-f]+$":
-    $ref: /schemas/phy/qcom,x1e80100-csi2-phy.yaml
-    unevaluatedProperties: false
-
-  "^opp-table(-.*)?$":
-    type: object
-
 required:
   - compatible
   - reg
