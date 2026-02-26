@@ -59,6 +59,12 @@ struct mipi_csi2phy_device_regs {
 	} generation;
 };
 
+#define MAX_CSI2PHY_CLKS 8
+struct mipi_csi2phy_clk_freq {
+	u32 num_freq;
+	u32 freq[MAX_CSI2PHY_CLKS];
+};
+
 struct mipi_csi2phy_soc_cfg {
 	const struct mipi_csi2phy_hw_ops *ops;
 	const struct mipi_csi2phy_device_regs reg_info;
@@ -72,8 +78,7 @@ struct mipi_csi2phy_soc_cfg {
 	const char * const opp_clk;
 	const char * const timer_clk;
 
-	const char ** const genpd_names;
-	const unsigned int num_genpd_names;
+	const struct mipi_csi2phy_clk_freq clk_freq[];
 };
 
 struct mipi_csi2phy_device {
@@ -83,12 +88,8 @@ struct mipi_csi2phy_device {
 	void __iomem *base;
 
 	struct clk_bulk_data *clks;
-	struct clk *timer_clk;
-	u32 timer_clk_rate;
-
 	struct regulator_bulk_data *supplies;
-	struct device **pds;
-	unsigned int num_pds;
+	u32 timer_clk_rate;
 
 	const struct mipi_csi2phy_soc_cfg *soc_cfg;
 	struct mipi_csi2phy_stream_cfg stream_cfg;

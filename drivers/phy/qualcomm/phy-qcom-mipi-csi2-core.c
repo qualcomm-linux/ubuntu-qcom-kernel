@@ -13,7 +13,6 @@
 #include <linux/phy/phy.h>
 #include <linux/phy/phy-mipi-dphy.h>
 #include <linux/platform_device.h>
-#include <linux/pm_domain.h>
 #include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
@@ -22,51 +21,99 @@
 
 #include "phy-qcom-mipi-csi2.h"
 
+#define CAMSS_CLOCK_MARGIN_NUMERATOR 105
+#define CAMSS_CLOCK_MARGIN_DENOMINATOR 100
+
+static inline void phy_qcom_mipi_csi2_add_clock_margin(u64 *rate)
+{
+	*rate *= CAMSS_CLOCK_MARGIN_NUMERATOR;
+	*rate = div_u64(*rate, CAMSS_CLOCK_MARGIN_DENOMINATOR);
+}
+
 static int
 phy_qcom_mipi_csi2_set_clock_rates(struct mipi_csi2phy_device *csi2phy,
 				   s64 link_freq)
 {
+	const struct mipi_csi2phy_soc_cfg *soc_cfg = csi2phy->soc_cfg;
+	unsigned long rates[MAX_CSI2PHY_CLKS] = {0};
 	struct device *dev = csi2phy->dev;
-	unsigned long opp_rate = link_freq / 4;
-	struct dev_pm_opp *opp;
-	long timer_rate;
+	unsigned long vote_freq = 0;
+	int i, j;
 	int ret;
 
-	opp = dev_pm_opp_find_freq_ceil(dev, &opp_rate);
-	if (IS_ERR(opp)) {
-		dev_err(csi2phy->dev, "Couldn't find ceiling for %lld Hz\n",
-			link_freq);
-		return PTR_ERR(opp);
+	for (i = 0; i < soc_cfg->num_clk; i++) {
+		const struct mipi_csi2phy_clk_freq *clk_freq = &soc_cfg->clk_freq[i];
+		const char *clk_name = soc_cfg->clk_names[i];
+		struct clk *clk = csi2phy->clks[i].clk;
+		u64 min_rate = link_freq / 4;
+		long round_rate;
+
+		phy_qcom_mipi_csi2_add_clock_margin(&min_rate);
+
+		/* This clock should be enabled only not set */
+		if (!clk_freq->num_freq)
+			continue;
+
+		for (j = 0; j < clk_freq->num_freq; j++)
+			if (min_rate < clk_freq->freq[j])
+				break;
+
+		if (j == clk_freq->num_freq) {
+			dev_err(dev,
+				"Pixel clock %llu is too high for %s\n",
+				min_rate, clk_name);
+			return -EINVAL;
+		}
+
+		/* if sensor pixel clock is not available
+		 * set highest possible CSIPHY clock rate
+		 */
+		if (min_rate == 0)
+			j = clk_freq->num_freq - 1;
+
+		round_rate = clk_round_rate(clk, clk_freq->freq[j]);
+		if (round_rate < 0) {
+			dev_err(dev, "clk round rate failed: %ld\n",
+				round_rate);
+			return -EINVAL;
+		}
+
+		rates[i] = round_rate;
+
+		if (!strcmp(clk_name, soc_cfg->timer_clk))
+			csi2phy->timer_clk_rate = round_rate;
+
+		if (!strcmp(clk_name, soc_cfg->opp_clk))
+			vote_freq = round_rate;
 	}
 
-	for (int i = 0; i < csi2phy->num_pds; i++) {
-		unsigned int perf = dev_pm_opp_get_required_pstate(opp, i);
+	if (!vote_freq) {
+		dev_err(dev, "Unable to find operating point frequency\n");
+		return -ENODEV;
+	};
 
-		ret = dev_pm_genpd_set_performance_state(csi2phy->pds[i], perf);
-		if (ret) {
-			dev_err(csi2phy->dev, "Couldn't set perf state %u\n",
-				perf);
-			dev_pm_opp_put(opp);
+	dev_dbg(dev, "OPP freq: %lu Hz\n", vote_freq);
+
+	ret = dev_pm_opp_set_rate(dev, vote_freq);
+	if (ret < 0) {
+		dev_err(dev, "Failed to set OPP rate: %d\n", ret);
+		return ret;
+	}
+
+	for (i = 0; i < soc_cfg->num_clk; i++) {
+		if (rates[i] == 0)
+			continue;
+
+		dev_dbg(dev, "Setting clk %s to %lu Hz\n",
+			soc_cfg->clk_names[i], rates[i]);
+
+		ret = clk_set_rate(csi2phy->clks[i].clk, rates[i]);
+		if (ret < 0) {
+			dev_err(dev, "clk_set_rate failed for %s: %d\n",
+				soc_cfg->clk_names[i], ret);
 			return ret;
 		}
 	}
-	dev_pm_opp_put(opp);
-
-	ret = dev_pm_opp_set_rate(dev, opp_rate);
-	if (ret) {
-		dev_err(csi2phy->dev, "dev_pm_opp_set_rate() fail\n");
-		return ret;
-	}
-
-	timer_rate = clk_round_rate(csi2phy->timer_clk, link_freq / 4);
-	if (timer_rate < 0)
-		return timer_rate;
-
-	ret = clk_set_rate(csi2phy->timer_clk, timer_rate);
-	if (ret)
-		return ret;
-
-	csi2phy->timer_clk_rate = timer_rate;
 
 	return 0;
 }
@@ -150,10 +197,6 @@ poweroff_phy:
 static int phy_qcom_mipi_csi2_power_off(struct phy *phy)
 {
 	struct mipi_csi2phy_device *csi2phy = phy_get_drvdata(phy);
-	int i;
-
-	for (int i = 0; i < csi2phy->num_pds; i++)
-		dev_pm_genpd_set_performance_state(csi2phy->pds[i], 0);
 
 	clk_bulk_disable_unprepare(csi2phy->soc_cfg->num_clk,
 				   csi2phy->clks);
@@ -172,7 +215,7 @@ static const struct phy_ops phy_qcom_mipi_csi2_ops = {
 
 static int phy_qcom_mipi_csi2_probe(struct platform_device *pdev)
 {
-	unsigned int i, num_clk, num_supplies, num_pds;
+	unsigned int i, num_clk, num_supplies;
 	struct mipi_csi2phy_device *csi2phy;
 	struct phy_provider *phy_provider;
 	struct device *dev = &pdev->dev;
@@ -194,37 +237,12 @@ static int phy_qcom_mipi_csi2_probe(struct platform_device *pdev)
 	if (!csi2phy->clks)
 		return -ENOMEM;
 
-	num_pds = csi2phy->soc_cfg->num_genpd_names;
-	if (!num_pds)
-		return -EINVAL;
-
-	csi2phy->pds = devm_kzalloc(dev, sizeof(*csi2phy->pds) * num_pds, GFP_KERNEL);
-	if (!csi2phy->pds)
-		return -ENOMEM;
-
-	for (i = 0; i < num_pds; i++) {
-		csi2phy->pds[i] = dev_pm_domain_attach_by_name(dev,
-							       csi2phy->soc_cfg->genpd_names[i]);
-		if (IS_ERR(csi2phy->pds[i])) {
-			return dev_err_probe(dev, PTR_ERR(csi2phy->pds[i]),
-					     "Failed to attach %s\n",
-					     csi2phy->soc_cfg->genpd_names[i]);
-		}
-	}
-	csi2phy->num_pds = num_pds;
-
 	for (i = 0; i < num_clk; i++)
 		csi2phy->clks[i].id = csi2phy->soc_cfg->clk_names[i];
 
 	ret = devm_clk_bulk_get(dev, num_clk, csi2phy->clks);
 	if (ret)
 		return dev_err_probe(dev, ret, "Failed to get clocks\n");
-
-	csi2phy->timer_clk = devm_clk_get(dev, csi2phy->soc_cfg->timer_clk);
-	if (IS_ERR(csi2phy->timer_clk)) {
-		return dev_err_probe(dev, PTR_ERR(csi2phy->timer_clk),
-				     "Failed to get timer clock\n");
-	}
 
 	ret = devm_pm_opp_set_clkname(dev, csi2phy->soc_cfg->opp_clk);
 	if (ret)
