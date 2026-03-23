@@ -2451,8 +2451,8 @@
 
 			clocks = <&gcc GCC_UFS_PHY_ICE_CORE_CLK>,
 				 <&gcc GCC_UFS_PHY_AHB_CLK>;
-			clock-names = "ice_core_clk",
-				      "iface_clk";
+			clock-names = "core",
+				      "iface";
 			power-domains = <&gcc UFS_PHY_GDSC>;
 		};
 
