@@ -4474,42 +4474,9 @@
 			};
 		};
 
-		lpass_vamacro: codec@7660000 {
-			compatible = "qcom,glymur-lpass-va-macro", "qcom,sm8550-lpass-va-macro";
-			reg = <0 0x07660000 0 0x1000>;
-			clocks = <&q6prmcc LPASS_CLK_ID_TX_CORE_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
-				 <&q6prmcc LPASS_HW_MACRO_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
-				 <&q6prmcc LPASS_HW_DCODEC_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
-			clock-names = "mclk",
-				      "macro",
-				      "dcodec";
-
-			#clock-cells = <0>;
-			clock-output-names = "fsgen";
-			#sound-dai-cells = <1>;
-		};
-
-		lpass_wsamacro: codec@6c90000 {
-			compatible = "qcom,glymur-lpass-wsa-macro", "qcom,sm8550-lpass-wsa-macro";
-			reg = <0 0x06c90000 0 0x1000>;
-			clocks = <&q6prmcc LPASS_CLK_ID_WSA_CORE_TX_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
-				 <&q6prmcc LPASS_HW_MACRO_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
-				 <&q6prmcc LPASS_HW_DCODEC_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
-				 <&lpass_vamacro>;
-			clock-names = "mclk",
-				      "macro",
-				      "dcodec",
-				      "fsgen";
-
-			#clock-cells = <0>;
-			clock-output-names = "mclk";
-			#sound-dai-cells = <1>;
-			sound-name-prefix = "WSA";
-		};
-
 		swr0: soundwire@6c80000 {
 			compatible = "qcom,soundwire-v3.1.0";
-			reg = <0 0x06c80000 0 0x10000>;
+			reg = <0x0 0x06c80000 0x0 0x10000>;
 			interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&lpass_wsamacro>;
 			clock-names = "iface";
@@ -4533,10 +4500,10 @@
 			status = "disabled";
 		};
 
-		lpass_wsa2macro: codec@6cb0000 {
+		lpass_wsamacro: codec@6c90000 {
 			compatible = "qcom,glymur-lpass-wsa-macro", "qcom,sm8550-lpass-wsa-macro";
-			reg = <0 0x06cb0000 0 0x1000>;
-			clocks = <&q6prmcc LPASS_CLK_ID_WSA2_CORE_TX_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+			reg = <0x0 0x06c90000 0x0 0x1000>;
+			clocks = <&q6prmcc LPASS_CLK_ID_WSA_CORE_TX_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
 				 <&q6prmcc LPASS_HW_MACRO_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
 				 <&q6prmcc LPASS_HW_DCODEC_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
 				 <&lpass_vamacro>;
@@ -4546,14 +4513,14 @@
 				      "fsgen";
 
 			#clock-cells = <0>;
-			clock-output-names = "wsa2-mclk";
+			clock-output-names = "mclk";
 			#sound-dai-cells = <1>;
-			sound-name-prefix = "WSA2";
+			sound-name-prefix = "WSA";
 		};
 
 		swr3: soundwire@6ca0000 {
 			compatible = "qcom,soundwire-v3.1.0";
-			reg = <0 0x06ca0000 0 0x10000>;
+			reg = <0x0 0x06ca0000 0x0 0x10000>;
 			interrupts = <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&lpass_wsa2macro>;
 			clock-names = "iface";
@@ -4578,9 +4545,56 @@
 			status = "disabled";
 		};
 
-		lpass_tlmm: pinctrl@6e80000 {
+		lpass_wsa2macro: codec@6cb0000 {
+			compatible = "qcom,glymur-lpass-wsa-macro", "qcom,sm8550-lpass-wsa-macro";
+			reg = <0x0 0x06cb0000 0x0 0x1000>;
+			clocks = <&q6prmcc LPASS_CLK_ID_WSA2_CORE_TX_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+				 <&q6prmcc LPASS_HW_MACRO_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+				 <&q6prmcc LPASS_HW_DCODEC_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+				 <&lpass_vamacro>;
+			clock-names = "mclk",
+				      "macro",
+				      "dcodec",
+				      "fsgen";
+
+			#clock-cells = <0>;
+			clock-output-names = "wsa2-mclk";
+			#sound-dai-cells = <1>;
+			sound-name-prefix = "WSA2";
+		};
+
+		lpass_lpiaon_noc: interconnect@7400000 {
+			compatible = "qcom,glymur-lpass-lpiaon-noc";
+			reg = <0x0 0x07400000 0x0 0x19080>;
+			qcom,bcm-voters = <&apps_bcm_voter>;
+			#interconnect-cells = <2>;
+		};
+
+		lpass_lpicx_noc: interconnect@7420000 {
+			compatible = "qcom,glymur-lpass-lpicx-noc";
+			reg = <0x0 0x07420000 0x0 0x44080>;
+			qcom,bcm-voters = <&apps_bcm_voter>;
+			#interconnect-cells = <2>;
+		};
+
+		lpass_vamacro: codec@7660000 {
+			compatible = "qcom,glymur-lpass-va-macro", "qcom,sm8550-lpass-va-macro";
+			reg = <0x0 0x07660000 0x0 0x2000>;
+			clocks = <&q6prmcc LPASS_CLK_ID_TX_CORE_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+				 <&q6prmcc LPASS_HW_MACRO_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+				 <&q6prmcc LPASS_HW_DCODEC_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
+			clock-names = "mclk",
+				      "macro",
+				      "dcodec";
+
+			#clock-cells = <0>;
+			clock-output-names = "fsgen";
+			#sound-dai-cells = <1>;
+		};
+
+		lpass_tlmm: pinctrl@7760000 {
 			compatible = "qcom,glymur-lpass-lpi-pinctrl", "qcom,sm8650-lpass-lpi-pinctrl";
-			reg = <0 0x07760000 0 0x20000>;
+			reg = <0x0 0x07760000 0x0 0x20000>;
 
 			clocks = <&q6prmcc LPASS_HW_MACRO_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
 				 <&q6prmcc LPASS_HW_DCODEC_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
@@ -4693,20 +4707,6 @@
 					bias-bus-hold;
 				};
 			};
-		};
-
-		lpass_lpiaon_noc: interconnect@7400000 {
-			compatible = "qcom,glymur-lpass-lpiaon-noc";
-			reg = <0x0 0x07400000 0x0 0x19080>;
-			qcom,bcm-voters = <&apps_bcm_voter>;
-			#interconnect-cells = <2>;
-		};
-
-		lpass_lpicx_noc: interconnect@7420000 {
-			compatible = "qcom,glymur-lpass-lpicx-noc";
-			reg = <0x0 0x07420000 0x0 0x44080>;
-			qcom,bcm-voters = <&apps_bcm_voter>;
-			#interconnect-cells = <2>;
 		};
 
 		lpass_ag_noc: interconnect@7e40000 {
