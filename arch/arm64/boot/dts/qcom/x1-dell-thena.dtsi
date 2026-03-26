@@ -847,7 +847,7 @@
 };
 
 &csiphy4 {
-	vdda-0p8-supply = <&vreg_l2c_0p8>;
+	vdda-0p9-supply = <&vreg_l2c_0p8>;
 	vdda-1p2-supply = <&vreg_l1c_1p2>;
 
 	status = "okay";
