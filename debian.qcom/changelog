@@ -1,0 +1,5 @@
+linux-qcom (7.0.0-1003.3) resolute; urgency=medium
+
+  Initial variant of Qualcomm
+
+ -- Kuba Pawlak <kuba.pawlak@canonical.com>  Mon, 20 Apr 2026 16:44:39 +0200
