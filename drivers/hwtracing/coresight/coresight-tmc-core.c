@@ -262,11 +262,10 @@ static int tmc_read_prepare(struct tmc_drvdata *drvdata)
 	const struct tmc_sysfs_ops *byte_cntr_sysfs_ops;
 	int ret = 0;
 
-	byte_cntr_sysfs_ops = tmc_get_byte_cntr_sysfs_ops(drvdata);
-	if (byte_cntr_sysfs_ops) {
-		ret = byte_cntr_sysfs_ops->read_prepare(drvdata);
-		goto out;
-	}
+	if (drvdata->sysfs_ops)
+		ret = drvdata->sysfs_ops->read_prepare(drvdata);
+	else
+		ret = -EINVAL;
 
 	if (drvdata->sysfs_ops)
 		ret = drvdata->sysfs_ops->read_prepare(drvdata);
@@ -285,11 +284,10 @@ static int tmc_read_unprepare(struct tmc_drvdata *drvdata)
 	const struct tmc_sysfs_ops *byte_cntr_sysfs_ops;
 	int ret = 0;
 
-	byte_cntr_sysfs_ops = tmc_get_byte_cntr_sysfs_ops(drvdata);
-	if (byte_cntr_sysfs_ops) {
-		ret = byte_cntr_sysfs_ops->read_unprepare(drvdata);
-		goto out;
-	}
+	if (drvdata->sysfs_ops)
+		ret = drvdata->sysfs_ops->read_unprepare(drvdata);
+	else
+		ret = -EINVAL;
 
 	if (drvdata->sysfs_ops)
 		ret = drvdata->sysfs_ops->read_unprepare(drvdata);
@@ -322,12 +320,6 @@ static int tmc_open(struct inode *inode, struct file *file)
 static ssize_t tmc_get_sysfs_trace(struct tmc_drvdata *drvdata, loff_t pos, size_t len,
 				   char **bufpp)
 {
-	const struct tmc_sysfs_ops *byte_cntr_sysfs_ops;
-
-	byte_cntr_sysfs_ops = tmc_get_byte_cntr_sysfs_ops(drvdata);
-	if (byte_cntr_sysfs_ops)
-		return byte_cntr_sysfs_ops->get_trace_data(drvdata, pos, len, bufpp);
-
 	return drvdata->sysfs_ops->get_trace_data(drvdata, pos, len, bufpp);
 }
 
@@ -923,112 +915,6 @@ static const struct tmc_sysfs_ops etr_sysfs_ops = {
 	.get_trace_data	= tmc_etr_get_sysfs_trace,
 };
 
-static int tmc_add_coresight_dev(struct device *dev)
-{
-	struct tmc_drvdata *drvdata = dev_get_drvdata(dev);
-	struct coresight_desc desc = { 0 };
-	struct coresight_dev_list *dev_list = NULL;
-	int ret = 0;
-
-	desc.access = CSDEV_ACCESS_IOMEM(drvdata->base);
-	desc.dev = dev;
-
-	switch (drvdata->config_type) {
-	case TMC_CONFIG_TYPE_ETB:
-		desc.groups = coresight_etf_groups;
-		desc.type = CORESIGHT_DEV_TYPE_SINK;
-		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
-		desc.ops = &tmc_etb_cs_ops;
-		dev_list = &etb_devs;
-		drvdata->sysfs_ops = &etb_sysfs_ops;
-		break;
-	case TMC_CONFIG_TYPE_ETR:
-		desc.groups = coresight_etr_groups;
-		desc.type = CORESIGHT_DEV_TYPE_SINK;
-		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_SYSMEM;
-		desc.ops = &tmc_etr_cs_ops;
-		ret = tmc_etr_setup_caps(dev, drvdata->devid, &desc.access);
-		if (ret)
-			return ret;
-		idr_init(&drvdata->idr);
-		mutex_init(&drvdata->idr_mutex);
-		dev_list = &etr_devs;
-		INIT_LIST_HEAD(&drvdata->etr_buf_list);
-		drvdata->sysfs_ops = &etr_sysfs_ops;
-		break;
-	case TMC_CONFIG_TYPE_ETF:
-		desc.groups = coresight_etf_groups;
-		desc.type = CORESIGHT_DEV_TYPE_LINKSINK;
-		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
-		desc.subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_FIFO;
-		desc.ops = &tmc_etf_cs_ops;
-		dev_list = &etf_devs;
-		drvdata->sysfs_ops = &etb_sysfs_ops;
-		break;
-	default:
-		pr_err("%s: Unsupported TMC config\n", desc.name);
-		return -EINVAL;
-	}
-
-	desc.name = coresight_alloc_device_name(dev_list, dev);
-	if (!desc.name)
-		return -ENOMEM;
-
-	drvdata->desc_name = desc.name;
-
-	desc.pdata = dev->platform_data;
-
-	drvdata->csdev = coresight_register(&desc);
-	if (IS_ERR(drvdata->csdev))
-		return PTR_ERR(drvdata->csdev);
-
-	drvdata->miscdev.name = desc.name;
-	drvdata->miscdev.minor = MISC_DYNAMIC_MINOR;
-	drvdata->miscdev.fops = &tmc_fops;
-	ret = misc_register(&drvdata->miscdev);
-	if (ret)
-		coresight_unregister(drvdata->csdev);
-
-	return ret;
-}
-
-static void tmc_clear_self_claim_tag(struct tmc_drvdata *drvdata)
-{
-	struct csdev_access access = CSDEV_ACCESS_IOMEM(drvdata->base);
-
-	coresight_clear_self_claim_tag(&access);
-}
-
-static void tmc_init_hw_config(struct tmc_drvdata *drvdata)
-{
-	u32 devid;
-
-	devid = readl_relaxed(drvdata->base + CORESIGHT_DEVID);
-	drvdata->config_type = BMVAL(devid, 6, 7);
-	drvdata->memwidth = tmc_get_memwidth(devid);
-	drvdata->devid = devid;
-	drvdata->size = readl_relaxed(drvdata->base + TMC_RSZ) * 4;
-	tmc_clear_self_claim_tag(drvdata);
-}
-
-static void tmc_init_on_cpu(void *info)
-{
-	struct tmc_drvdata *drvdata = info;
-
-	tmc_init_hw_config(drvdata);
-}
-
-static struct cpumask *tmc_get_supported_cpus(struct device *dev)
-{
-	struct generic_pm_domain *pd;
-
-	pd = pd_to_genpd(dev->pm_domain);
-	if (pd)
-		return pd->cpus;
-
-	return NULL;
-}
-
 static int __tmc_probe(struct device *dev, struct resource *res)
 {
 	int cpu, ret = 0;
@@ -1062,6 +948,52 @@ static int __tmc_probe(struct device *dev, struct resource *res)
 	drvdata->pid = -1;
 	drvdata->etr_mode = ETR_MODE_AUTO;
 	tmc_get_reserved_region(dev);
+
+	desc.dev = dev;
+
+	switch (drvdata->config_type) {
+	case TMC_CONFIG_TYPE_ETB:
+		desc.groups = coresight_etf_groups;
+		desc.type = CORESIGHT_DEV_TYPE_SINK;
+		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
+		desc.ops = &tmc_etb_cs_ops;
+		dev_list = "tmc_etb";
+		drvdata->sysfs_ops = &etb_sysfs_ops;
+		break;
+	case TMC_CONFIG_TYPE_ETR:
+		desc.groups = coresight_etr_groups;
+		desc.type = CORESIGHT_DEV_TYPE_SINK;
+		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_SYSMEM;
+		desc.ops = &tmc_etr_cs_ops;
+		ret = tmc_etr_setup_caps(dev, devid, &desc.access);
+		if (ret)
+			goto out;
+		idr_init(&drvdata->idr);
+		mutex_init(&drvdata->idr_mutex);
+		dev_list = "tmc_etr";
+		drvdata->sysfs_ops = &etr_sysfs_ops;
+		INIT_LIST_HEAD(&drvdata->etr_buf_list);
+		break;
+	case TMC_CONFIG_TYPE_ETF:
+		desc.groups = coresight_etf_groups;
+		desc.type = CORESIGHT_DEV_TYPE_LINKSINK;
+		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
+		desc.subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_FIFO;
+		desc.ops = &tmc_etf_cs_ops;
+		dev_list = "tmc_etf";
+		drvdata->sysfs_ops = &etb_sysfs_ops;
+		break;
+	default:
+		pr_err("%s: Unsupported TMC config\n", desc.name);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	desc.name = coresight_alloc_device_name(dev_list, dev);
+	if (!desc.name) {
+		ret = -ENOMEM;
+		goto out;
+	}
 
 	pdata = coresight_get_platform_data(dev);
 	if (IS_ERR(pdata)) {
