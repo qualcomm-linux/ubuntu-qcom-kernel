@@ -1031,7 +1031,7 @@ mic_fail:
 		    RX_FLAG_IV_STRIPPED | RX_FLAG_DECRYPTED;
 	skb_pull(msdu, hal_rx_desc_sz);
 
-	if (unlikely(!ath12k_dp_rx_check_nwifi_hdr_len_valid(dp, rx_desc, msdu,
+	if (unlikely(!ath12k_dp_rx_check_nwifi_hdr_len_valid(dp, msdu,
 							     rx_info))) {
 		dev_kfree_skb_any(msdu);
 		return -EINVAL;
