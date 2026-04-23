@@ -284,8 +284,6 @@ struct qcom_smem {
 	struct smem_partition global_partition;
 	struct xarray partitions;
 
-	struct dentry *debugfs_dir;
-
 	unsigned num_regions;
 	struct smem_region regions[] __counted_by(num_regions);
 };
