@@ -485,9 +485,9 @@ static ssize_t inen_store(struct device *dev,
 	config->ctiinen[index] = val;
 
 	/* write through if enabled */
-	if (cti_active(config))
-		cti_write_single_reg(drvdata, cti_offset(drvdata, INDEX_CTIINEN, index), val);
-	raw_spin_unlock(&drvdata->spinlock);
+	if (cti_is_active(config))
+		cti_write_single_reg(drvdata, CTI_REG_SET_NR(CTIINEN, index), val);
+
 	return size;
 }
 static DEVICE_ATTR_RW(inen);
@@ -524,9 +524,9 @@ static ssize_t outen_store(struct device *dev,
 	config->ctiouten[index] = val;
 
 	/* write through if enabled */
-	if (cti_active(config))
-		cti_write_single_reg(drvdata, cti_offset(drvdata, INDEX_CTIOUTEN, index), val);
-	raw_spin_unlock(&drvdata->spinlock);
+	if (cti_is_active(config))
+		cti_write_single_reg(drvdata, CTI_REG_SET_NR(CTIOUTEN, index), val);
+
 	return size;
 }
 static DEVICE_ATTR_RW(outen);

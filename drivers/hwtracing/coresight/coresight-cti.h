@@ -7,6 +7,7 @@
 #ifndef _CORESIGHT_CORESIGHT_CTI_H
 #define _CORESIGHT_CORESIGHT_CTI_H
 
+#include <linux/bitfield.h>
 #include <linux/coresight.h>
 #include <linux/device.h>
 #include <linux/list.h>
@@ -30,8 +31,8 @@ struct fwnode_handle;
 #define CTIAPPSET		0x014
 #define CTIAPPCLEAR		0x018
 #define CTIAPPPULSE		0x01C
-#define CTIINEN(n)		(0x020 + (4 * n))
-#define CTIOUTEN(n)		(0x0A0 + (4 * n))
+#define CTIINEN			0x020
+#define CTIOUTEN		0x0A0
 #define CTITRIGINSTATUS		0x130
 #define CTITRIGOUTSTATUS	0x134
 #define CTICHINSTATUS		0x138
@@ -89,6 +90,17 @@ enum cti_offset_index {
 	INDEX_ITTRIGIN,
 	INDEX_ITCTRL,
 };
+
+/*
+ * Encode CTI register offset and register index in one u32:
+ *   - bits[0:11]  : base register offset (0x000 to 0xFFF)
+ *   - bits[24:31] : register index (nr)
+ */
+#define CTI_REG_NR_MASK			GENMASK(31, 24)
+#define CTI_REG_GET_NR(reg)		FIELD_GET(CTI_REG_NR_MASK, (reg))
+#define CTI_REG_SET_NR_CONST(reg, nr)	((reg) | FIELD_PREP_CONST(CTI_REG_NR_MASK, (nr)))
+#define CTI_REG_SET_NR(reg, nr)		((reg) | FIELD_PREP(CTI_REG_NR_MASK, (nr)))
+#define CTI_REG_CLR_NR(reg)		((reg) & (~CTI_REG_NR_MASK))
 
 /**
  * Group of related trigger signals

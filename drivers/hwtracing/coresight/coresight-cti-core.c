@@ -91,20 +91,13 @@ static DEFINE_MUTEX(ect_mutex);
 #define csdev_to_cti_drvdata(csdev)	\
 	dev_get_drvdata(csdev->dev.parent)
 
-/* power management handling */
-static int nr_cti_cpu;
+static void __iomem *cti_reg_addr(struct cti_drvdata *drvdata, int reg)
+{
+	u32 offset = CTI_REG_CLR_NR(reg);
+	u32 nr = CTI_REG_GET_NR(reg);
 
-/* quick lookup list for CPU bound CTIs when power handling */
-static struct cti_drvdata *cti_cpu_drvdata[NR_CPUS];
-
-/*
- * CTI naming. CTI bound to cores will have the name cti_cpu<N> where
- * N is the CPU ID. System CTIs will have the name cti_sys<I> where I
- * is an index allocated by order of discovery.
- *
- * CTI device name list - for CTI not bound to cores.
- */
-DEFINE_CORESIGHT_DEVLIST(cti_sys_devs, "cti_sys");
+	return drvdata->base + offset + sizeof(u32) * nr;
+}
 
 /* write set of regs to hardware - call with spinlock claimed */
 void cti_write_all_hw_regs(struct cti_drvdata *drvdata)
@@ -120,15 +113,16 @@ void cti_write_all_hw_regs(struct cti_drvdata *drvdata)
 	/* write the CTI trigger registers */
 	for (i = 0; i < config->nr_trig_max; i++) {
 		writel_relaxed(config->ctiinen[i],
-			       drvdata->base + cti_offset(drvdata, INDEX_CTIINEN, i));
+			       cti_reg_addr(drvdata, CTI_REG_SET_NR(CTIINEN, i)));
 		writel_relaxed(config->ctiouten[i],
-			       drvdata->base + cti_offset(drvdata, INDEX_CTIOUTEN, i));
+			       cti_reg_addr(drvdata, CTI_REG_SET_NR(CTIOUTEN, i)));
 	}
 
 	/* other regs */
-	writel_relaxed(config->ctigate, drvdata->base + cti_offset(drvdata, INDEX_CTIGATE, 0));
-	writel_relaxed(config->asicctl, drvdata->base + cti_offset(drvdata, INDEX_ASICCTL, 0));
-	writel_relaxed(config->ctiappset, drvdata->base + cti_offset(drvdata, INDEX_CTIAPPSET, 0));
+	writel_relaxed(config->ctigate, cti_reg_addr(drvdata, CTIGATE));
+	if (config->asicctl_impl)
+		writel_relaxed(config->asicctl, cti_reg_addr(drvdata, ASICCTL));
+	writel_relaxed(config->ctiappset, cti_reg_addr(drvdata, CTIAPPSET));
 
 	/* re-enable CTI */
 	writel_relaxed(1, drvdata->base + CTICONTROL);
@@ -230,16 +224,21 @@ static int cti_disable_hw(struct cti_drvdata *drvdata)
 	raw_spin_unlock(&drvdata->spinlock);
 	return ret;
 
-	/* not disabled this call */
-cti_not_disabled:
-	raw_spin_unlock(&drvdata->spinlock);
-	return ret;
+u32 cti_read_single_reg(struct cti_drvdata *drvdata, int offset)
+{
+	int val;
+
+	CS_UNLOCK(drvdata->base);
+	val = readl_relaxed(cti_reg_addr(drvdata, offset));
+	CS_LOCK(drvdata->base);
+
+	return val;
 }
 
 void cti_write_single_reg(struct cti_drvdata *drvdata, int offset, u32 value)
 {
 	CS_UNLOCK(drvdata->base);
-	writel_relaxed(value, drvdata->base + offset);
+	writel_relaxed(value, cti_reg_addr(drvdata, offset));
 	CS_LOCK(drvdata->base);
 }
 
@@ -447,8 +446,7 @@ int cti_channel_trig_op(struct device *dev, enum cti_chan_op op,
 
 	/* update the local register values */
 	chan_bitmask = BIT(channel_idx);
-	reg_offset = (direction == CTI_TRIG_IN ? cti_offset(drvdata, INDEX_CTIINEN, trigger_idx) :
-			cti_offset(drvdata, INDEX_CTIOUTEN, trigger_idx));
+	reg_offset = (direction == CTI_TRIG_IN ? CTIINEN : CTIOUTEN);
 
 	raw_spin_lock(&drvdata->spinlock);
 
@@ -467,9 +465,10 @@ int cti_channel_trig_op(struct device *dev, enum cti_chan_op op,
 		config->ctiouten[trigger_idx] = reg_value;
 
 	/* write through if enabled */
-	if (cti_active(config))
-		cti_write_single_reg(drvdata, reg_offset, reg_value);
-	raw_spin_unlock(&drvdata->spinlock);
+	if (cti_is_active(config))
+		cti_write_single_reg(drvdata,
+				     CTI_REG_SET_NR(reg_offset, trigger_idx),
+				     reg_value);
 	return 0;
 }
 
