@@ -55,41 +55,11 @@ struct fwnode_handle;
 /*
  * CTI CSSoc 600 has a max of 32 trigger signals per direction.
  * CTI CSSoc 400 has 8 IO triggers - other CTIs can be impl def.
+ * QCOM CTI supports up to 128 trigger signals per direction.
  * Max of in and out defined in the DEVID register.
  * - pick up actual number used from .dts parameters if present.
  */
 #define CTIINOUTEN_MAX		128
-
-/* Qcom CTI supports up to 128 triggers*/
-enum cti_subtype {
-	ARM_STD_CTI,
-	QCOM_CTI,
-};
-
-/* These registers are remapped in Qcom CTI*/
-enum cti_offset_index {
-	INDEX_CTIINTACK,
-	INDEX_CTIAPPSET,
-	INDEX_CTIAPPCLEAR,
-	INDEX_CTIAPPPULSE,
-	INDEX_CTIINEN,
-	INDEX_CTIOUTEN,
-	INDEX_CTITRIGINSTATUS,
-	INDEX_CTITRIGOUTSTATUS,
-	INDEX_CTICHINSTATUS,
-	INDEX_CTICHOUTSTATUS,
-	INDEX_CTIGATE,
-	INDEX_ASICCTL,
-	INDEX_ITCHINACK,
-	INDEX_ITTRIGINACK,
-	INDEX_ITCHOUT,
-	INDEX_ITTRIGOUT,
-	INDEX_ITCHOUTACK,
-	INDEX_ITTRIGOUTACK,
-	INDEX_ITCHIN,
-	INDEX_ITTRIGIN,
-	INDEX_ITCTRL,
-};
 
 /*
  * Encode CTI register offset and register index in one u32:
@@ -226,9 +196,7 @@ struct cti_drvdata {
 	raw_spinlock_t spinlock;
 	struct cti_config config;
 	struct list_head node;
-	void (*csdev_release)(struct device *dev);
-	enum cti_subtype subtype;
-	const u32 *offsets;
+	bool is_qcom_cti;
 };
 
 /*

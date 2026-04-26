@@ -23,54 +23,6 @@
 #include "coresight-cti.h"
 #include "qcom-cti.h"
 
-static const u32 cti_normal_offset[] = {
-	[INDEX_CTIINTACK]		= CTIINTACK,
-	[INDEX_CTIAPPSET]		= CTIAPPSET,
-	[INDEX_CTIAPPCLEAR]		= CTIAPPCLEAR,
-	[INDEX_CTIAPPPULSE]		= CTIAPPPULSE,
-	[INDEX_CTIINEN]			= CTIINEN(0),
-	[INDEX_CTIOUTEN]		= CTIOUTEN(0),
-	[INDEX_CTITRIGINSTATUS]		= CTITRIGINSTATUS,
-	[INDEX_CTITRIGOUTSTATUS]	= CTITRIGOUTSTATUS,
-	[INDEX_CTICHINSTATUS]		= CTICHINSTATUS,
-	[INDEX_CTICHOUTSTATUS]		= CTICHOUTSTATUS,
-	[INDEX_CTIGATE]			= CTIGATE,
-	[INDEX_ASICCTL]			= ASICCTL,
-	[INDEX_ITCHINACK]		= ITCHINACK,
-	[INDEX_ITTRIGINACK]		= ITTRIGINACK,
-	[INDEX_ITCHOUT]			= ITCHOUT,
-	[INDEX_ITTRIGOUT]		= ITTRIGOUT,
-	[INDEX_ITCHOUTACK]		= ITCHOUTACK,
-	[INDEX_ITTRIGOUTACK]		= ITTRIGOUTACK,
-	[INDEX_ITCHIN]			= ITCHIN,
-	[INDEX_ITTRIGIN]		= ITTRIGIN,
-	[INDEX_ITCTRL]			= CORESIGHT_ITCTRL,
-};
-
-static const u32 cti_extended_offset[] = {
-	[INDEX_CTIINTACK]		= QCOM_CTIINTACK,
-	[INDEX_CTIAPPSET]		= QCOM_CTIAPPSET,
-	[INDEX_CTIAPPCLEAR]		= QCOM_CTIAPPCLEAR,
-	[INDEX_CTIAPPPULSE]		= QCOM_CTIAPPPULSE,
-	[INDEX_CTIINEN]			= QCOM_CTIINEN,
-	[INDEX_CTIOUTEN]		= QCOM_CTIOUTEN,
-	[INDEX_CTITRIGINSTATUS]		= QCOM_CTITRIGINSTATUS,
-	[INDEX_CTITRIGOUTSTATUS]	= QCOM_CTITRIGOUTSTATUS,
-	[INDEX_CTICHINSTATUS]		= QCOM_CTICHINSTATUS,
-	[INDEX_CTICHOUTSTATUS]		= QCOM_CTICHOUTSTATUS,
-	[INDEX_CTIGATE]			= QCOM_CTIGATE,
-	[INDEX_ASICCTL]			= QCOM_ASICCTL,
-	[INDEX_ITCHINACK]		= QCOM_ITCHINACK,
-	[INDEX_ITTRIGINACK]		= QCOM_ITTRIGINACK,
-	[INDEX_ITCHOUT]			= QCOM_ITCHOUT,
-	[INDEX_ITTRIGOUT]		= QCOM_ITTRIGOUT,
-	[INDEX_ITCHOUTACK]		= QCOM_ITCHOUTACK,
-	[INDEX_ITTRIGOUTACK]		= QCOM_ITTRIGOUTACK,
-	[INDEX_ITCHIN]			= QCOM_ITCHIN,
-	[INDEX_ITTRIGIN]		= QCOM_ITTRIGIN,
-	[INDEX_ITCTRL]			= CORESIGHT_ITCTRL,
-};
-
 /*
  * CTI devices can be associated with a PE, or be connected to CoreSight
  * hardware. We have a list of all CTIs irrespective of CPU bound or
@@ -95,6 +47,10 @@ static void __iomem *cti_reg_addr(struct cti_drvdata *drvdata, int reg)
 {
 	u32 offset = CTI_REG_CLR_NR(reg);
 	u32 nr = CTI_REG_GET_NR(reg);
+
+	/* convert to qcom specific offset */
+	if (unlikely(drvdata->is_qcom_cti))
+		offset = cti_qcom_reg_off(offset);
 
 	return drvdata->base + offset + sizeof(u32) * nr;
 }
@@ -972,6 +928,22 @@ static int cti_probe(struct amba_device *adev, const struct amba_id *id)
 
 	raw_spin_lock_init(&drvdata->spinlock);
 
+	devarch = readl_relaxed(drvdata->base + CORESIGHT_DEVARCH);
+	if (CTI_DEVARCH_ARCHITECT(devarch) == ARCHITECT_QCOM) {
+		drvdata->is_qcom_cti = true;
+		/*
+		 * QCOM CTI does not implement Claimtag functionality as
+		 * per CoreSight specification, but its CLAIMSET register
+		 * is incorrectly initialized to 0xF. This can mislead
+		 * tools or drivers into thinking the component is claimed.
+		 *
+		 * Reset CLAIMSET to 0 to reflect that no claims are active.
+		 */
+		CS_UNLOCK(drvdata->base);
+		writel_relaxed(0, drvdata->base + CORESIGHT_CLAIMSET);
+		CS_LOCK(drvdata->base);
+	}
+
 	/* initialise CTI driver config values */
 	ret = cti_set_default_config(dev, drvdata);
 	if (ret)
@@ -1055,7 +1027,8 @@ static int cti_probe(struct amba_device *adev, const struct amba_id *id)
 
 	/* all done - dec pm refcount */
 	pm_runtime_put(&adev->dev);
-	dev_info(&drvdata->csdev->dev, "CTI initialized; subtype=%d\n", drvdata->subtype);
+	dev_info(&drvdata->csdev->dev,
+		 "%sCTI initialized\n", drvdata->is_qcom_cti ? "QCOM " : "");
 	return 0;
 
 pm_release:
