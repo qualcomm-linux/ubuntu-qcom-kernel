@@ -1,10 +1,10 @@
 build_arch	= arm64
 defconfig	= defconfig
-flavours	= qcom
+flavours	= qcom qcom-rt
 build_image	= Image.gz
 kernel_file	= arch/$(build_arch)/boot/Image.gz
 install_file	= vmlinuz
-no_dumpfile = true
+no_dumpfile	= true
 
 vdso		= vdso_install
 

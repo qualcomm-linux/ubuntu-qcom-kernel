@@ -1,10 +1,12 @@
 # Items that get replaced:
 # FLAVOUR
+# DESC
 # ARCH
 # SUPPORTED
 # TARGET
 # BOOTLOADER
 # =PROVIDES=
+# =DEPENDS=
 #
 # Items marked with =FOO= are optional
 #
@@ -25,7 +27,7 @@ Build-Profiles: <!stage1>
 Architecture: ARCH
 Section: kernel
 Priority: optional
-Depends: ${misc:Depends}, ${shlibs:Depends}, wireless-regdb
+Depends: ${misc:Depends}, ${shlibs:Depends}, =DEPENDS=wireless-regdb
 Built-Using: ${linux:BuiltUsing}
 Description: Linux kernel modules for version PKGVER
  Contains the corresponding System.map file, the modules built by the
@@ -53,9 +55,9 @@ Description: Linux kernel headers for version PKGVER
  This is for sites that want the latest kernel headers.  Please read
  /usr/share/doc/linux-headers-PKGVER-ABINUM/debian.README.gz for details.
 
-Package: linux-lib-rust-PKGVER-ABINUM-FLAVOUR
+Package: SRCPKGNAME-lib-rust-PKGVER-ABINUM-FLAVOUR
 Build-Profiles: <!stage1>
-Architecture: amd64
+Architecture: arm64
 Multi-Arch: foreign
 Section: devel
 Priority: optional
@@ -74,14 +76,3 @@ Description: Linux kernel version specific tools for version PKGVER-ABINUM
  This package provides the architecture dependant parts for kernel
  version locked tools (such as x86_energy_perf_policy) for
  version PKGVER-ABINUM.
-
-Package: linux-cloud-tools-PKGVER-ABINUM-FLAVOUR
-Build-Profiles: <!stage1>
-Architecture: ARCH
-Section: devel
-Priority: optional
-Depends: ${misc:Depends}, SRCPKGNAME-cloud-tools-PKGVER-ABINUM
-Description: Linux kernel version specific cloud tools for version PKGVER-ABINUM
- This package provides the architecture dependant parts for kernel
- version locked tools for cloud for version PKGVER-ABINUM.
-
