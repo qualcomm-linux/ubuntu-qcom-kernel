@@ -1,4 +1,5 @@
 # Recreate any symlinks created since the orig.
+[ ! -L 'ubuntu/igh-ecat/master/rtdm-ioctl.c' ] && ln -sf 'ioctl.c' 'ubuntu/igh-ecat/master/rtdm-ioctl.c'
 chmod +x 'debian/cloud-tools/hv_get_dhcp_info'
 chmod +x 'debian/cloud-tools/hv_get_dns_info'
 chmod +x 'debian/cloud-tools/hv_set_ifconfig'
@@ -30,10 +31,4 @@ chmod +x 'debian/templates/image.prerm.in'
 chmod +x 'debian/tests/rebuild'
 chmod +x 'debian/tests/ubuntu-regression-suite'
 # Remove any files deleted from the orig.
-rm -f 'arch/arm64/boot/dts/qcom/qcs8300-pmics.dtsi'
-rm -f 'arch/arm64/boot/dts/qcom/qcs8300.dtsi'
-rm -f 'arch/arm64/boot/dts/qcom/sm6150.dtsi'
-rm -f 'arch/arm64/boot/dts/qcom/x1e80100-pmics.dtsi'
-rm -f 'arch/arm64/boot/dts/qcom/x1e80100.dtsi'
-rm -f 'drivers/media/platform/qcom/iris/iris_platform_sm8250.c'
 exit 0
