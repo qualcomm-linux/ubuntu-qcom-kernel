@@ -72,11 +72,19 @@ static ssize_t reboot_modes_show(struct device *dev, struct device_attribute *at
 {
 	struct reboot_mode_driver *reboot;
 	struct mode_info *info;
-	ssize_t size = 0;
+	const char *dev_name;
+	int ret;
 
-	reboot = (struct reboot_mode_driver *)dev_get_drvdata(dev);
-	if (!reboot)
-		return -ENODATA;
+	dev_name = reboot->name;
+	if (!dev_name) {
+		if (!reboot->dev || !reboot->dev->driver)
+			return -EINVAL;
+		dev_name = reboot->dev->driver->name;
+	}
+
+	priv = kzalloc_obj(*priv, GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
 
 	list_for_each_entry(info, &reboot->head, list)
 		size += sysfs_emit_at(buf, size, "%s ", info->mode);
@@ -86,18 +94,12 @@ static ssize_t reboot_modes_show(struct device *dev, struct device_attribute *at
 		return size;
 	}
 
-	return -ENODATA;
-}
-static DEVICE_ATTR_RO(reboot_modes);
-
-static int create_reboot_mode_device(struct reboot_mode_driver *reboot)
-{
-	int ret = 0;
-
-	if (!rb_class) {
-		rb_class = class_create("reboot-mode");
-		if (IS_ERR(rb_class))
-			return PTR_ERR(rb_class);
+	priv->reboot_mode_device = device_create(&reboot_mode_class, NULL, 0,
+						 (void *)priv, "%s",
+						 dev_name);
+	if (IS_ERR(priv->reboot_mode_device)) {
+		ret = PTR_ERR(priv->reboot_mode_device);
+		goto error;
 	}
 
 	reboot->reboot_dev = device_create(rb_class, NULL, 0, (void *)reboot, reboot->driver_name);
@@ -199,6 +201,45 @@ error:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(reboot_mode_register);
+
+static int reboot_mode_match_by_name(struct device *dev, const void *data)
+{
+	const char *name = data;
+
+	if (!dev || !data)
+		return 0;
+
+	return dev_name(dev) && strcmp(dev_name(dev), name) == 0;
+}
+
+static inline void reboot_mode_unregister_device(struct reboot_mode_driver *reboot)
+{
+	struct reboot_mode_sysfs_data *priv;
+	struct device *reboot_mode_device;
+	const char *dev_name;
+
+	dev_name = reboot->name;
+	if (!dev_name) {
+		if (!reboot->dev || !reboot->dev->driver)
+			return;
+		dev_name = reboot->dev->driver->name;
+	}
+
+	reboot_mode_device = class_find_device(&reboot_mode_class, NULL, dev_name,
+					       reboot_mode_match_by_name);
+
+	if (!reboot_mode_device)
+		return;
+
+	priv = dev_get_drvdata(reboot_mode_device);
+	device_unregister(reboot_mode_device);
+
+	if (!priv)
+		return;
+
+	reboot_mode_release_list(priv);
+	kfree(priv);
+}
 
 /**
  * reboot_mode_unregister - unregister a reboot mode driver
