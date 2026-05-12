@@ -4361,7 +4361,6 @@
 			clocks = <&gpucc GPU_CC_GPU_SMMU_VOTE_CLK>;
 			clock-names = "hlos";
 			power-domains = <&gpucc GPU_CC_CX_GDSC>;
-			interconnects = <&hsc_noc MASTER_GPU_TCU &mc_virt SLAVE_EBI1>;
 			dma-coherent;
 		};
 
