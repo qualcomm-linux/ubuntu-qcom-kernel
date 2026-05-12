@@ -112,9 +112,19 @@ static int iris_load_fw_to_memory(struct iris_core *core)
 	mem_phys = res.start;
 	res_size = resource_size(&res);
 
-	ret = request_firmware(&firmware, fw_name, dev);
-	if (ret)
-		return ret;
+	dev = core->fw.dev ? : core->dev;
+
+	ctx = devm_qcom_scm_pas_context_alloc(dev, IRIS_PAS_ID, mem_phys, res_size);
+	if (!ctx)
+		return -ENOMEM;
+
+	ctx->use_tzmem = core->fw.dev;
+
+	firmware = iris_detect_firmware(core, &fw_name);
+	if (IS_ERR(firmware))
+		return PTR_ERR(firmware);
+
+	core->iris_firmware_data = core->iris_firmware_desc->firmware_data;
 
 	fw_size = qcom_mdt_get_size(firmware);
 	if (fw_size < 0 || res_size < (size_t)fw_size) {
@@ -143,20 +153,9 @@ int iris_fw_load(struct iris_core *core)
 	const struct tz_cp_config *cp_config;
 	int i, ret;
 
-	ret = of_property_read_string_index(core->dev->of_node, "firmware-name", 0,
-					    &fwpath);
-	if (ret)
-		fwpath = core->iris_firmware_desc->fwname;
-
-	ret = iris_load_fw_to_memory(core, fwpath);
+	ret = iris_load_fw_to_memory(core);
 	if (ret) {
 		dev_err(core->dev, "firmware download failed %d\n", ret);
-		return ret;
-	}
-
-	ret = qcom_scm_pas_auth_and_reset(IRIS_PAS_ID);
-	if (ret)  {
-		dev_err(core->dev, "auth and reset failed: %d\n", ret);
 		return ret;
 	}
 
