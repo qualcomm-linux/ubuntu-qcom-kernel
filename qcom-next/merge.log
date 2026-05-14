@@ -1,5 +1,5 @@
 Verified existence of local and remote repos: Success
-/local/mnt/workspace/automerge/actions-runner/_work/kernel-automation/kernel-automation/kernel-topics /local/mnt/workspace/automerge/actions-runner/_work/kernel-automation/kernel-automation/kernel-topics
+/local/mnt/workspace/sgaud/Builds/Github/All_Runners/kernel-automation/actions-runner/_work/kernel-automation/kernel-automation/kernel-topics /local/mnt/workspace/sgaud/Builds/Github/All_Runners/kernel-automation/actions-runner/_work/kernel-automation/kernel-automation/kernel-topics
 Reuse-Recorded-Resolution: Enabled
 Downloaded shared rerere cache
 Local tree is clean
@@ -13,6 +13,10 @@ Adding remote baseline https://github.com/qualcomm-linux/kernel.git qcom-next-st
 Updating baseline
 Adding remote tech/bsp/clk https://github.com/qualcomm-linux/kernel-topics.git tech/bsp/clk
 Updating tech/bsp/clk
+Adding remote tech/bsp/devfreq https://github.com/qualcomm-linux/kernel-topics.git tech/bsp/devfreq
+Updating tech/bsp/devfreq
+Adding remote tech/bsp/ec https://github.com/qualcomm-linux/kernel-topics.git tech/bsp/ec
+Updating tech/bsp/ec
 Adding remote tech/bsp/interconnect https://github.com/qualcomm-linux/kernel-topics.git tech/bsp/interconnect
 Updating tech/bsp/interconnect
 Adding remote tech/mem/secure-buffer https://github.com/qualcomm-linux/kernel-topics.git tech/mem/secure-buffer
@@ -151,9 +155,11 @@ Adding remote early/hwe/shikra/drivers https://github.com/qualcomm-linux/kernel-
 Updating early/hwe/shikra/drivers
 Adding remote early/hwe/shikra/dt https://github.com/qualcomm-linux/kernel-topics.git early/hwe/shikra/dt
 Updating early/hwe/shikra/dt
-Done, added 71 new remote(s).
+Done, added 73 new remote(s).
 Updating the remotes ...
 Updating tech/bsp/clk
+Updating tech/bsp/devfreq
+Updating tech/bsp/ec
 Updating tech/bsp/interconnect
 Updating tech/mem/secure-buffer
 Updating tech/security/firmware-smc
@@ -226,49 +232,52 @@ Updating early/hwe/shikra/dt
 Done, updated 0 remote(s).
 Updating baseline ...
 Fetching baseline
-latest tag/id is 7aaa8047eafd0bd628065b15757d9b48c5f9c07d
+latest tag/id is 7fd2df204f342fc17d1a0bfcd474b24232fb0f32
 Done, updated baseline.
-Latest tag is 7aaa8047eafd0bd628065b15757d9b48c5f9c07d
-Create a new integration branch based on 7aaa8047eafd0bd628065b15757d9b48c5f9c07d
+Latest tag is 7fd2df204f342fc17d1a0bfcd474b24232fb0f32
+Create a new integration branch based on 7fd2df204f342fc17d1a0bfcd474b24232fb0f32
 Merging topic branches...
 ------------------------------------------
  ** Merging topic branch: tech/bsp/clk/tech/bsp/clk
-Merge successful : tech/bsp/clk : 90af1d3e6dede77b7c2eb4aa2ee56677023aedb3 : 12
+Merge successful : tech/bsp/clk : eea3e9858db5f675261967f5b88b78727049bf98 : 11
+------------------------------------------
+ ** Merging topic branch: tech/bsp/devfreq/tech/bsp/devfreq
+Merge successful : tech/bsp/devfreq : 6ebf719c35b8661be830d69b2ea595473cced6d0 : 6
+------------------------------------------
+ ** Merging topic branch: tech/bsp/ec/tech/bsp/ec
+Merge successful : tech/bsp/ec : 069ea63569dca468e6fda270ad396ce580a75325 : 2
 ------------------------------------------
  ** Merging topic branch: tech/bsp/interconnect/tech/bsp/interconnect
-Merge successful : tech/bsp/interconnect : 7d3a72c70998b3a0c25928ab7e61b4231467700d : 5
+Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/mem/secure-buffer/tech/mem/secure-buffer
 Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/security/firmware-smc/tech/security/firmware-smc
-Merge successful : tech/security/firmware-smc : a50984a91bb9d551ee48136ee2db90eca0929979 : 2
+Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/bsp/soc-infra/tech/bsp/soc-infra
-Merge successful : tech/bsp/soc-infra : c793ce5e280bffeca61ab6cdf9ef058c3ad92a99 : 5
+Merge successful : tech/bsp/soc-infra : 20c09ce873000ed6ee8e4ad9a3ff596f49f63778 : 3
 ------------------------------------------
  ** Merging topic branch: tech/debug/soc/tech/debug/soc
 Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/bsp/pinctrl/tech/bsp/pinctrl
-Merge successful : tech/bsp/pinctrl : 28c2b80824ce68f269fd85b0308df499bca9181d : 1
+Merge successful : tech/bsp/pinctrl : 3f1acf892d6623a15a7245d398ae04bb6d1e9f50 : 1
 ------------------------------------------
  ** Merging topic branch: tech/bsp/remoteproc/tech/bsp/remoteproc
-Merge successful : tech/bsp/remoteproc : abb91aeb56bf212aa9f8a0929bc728237e685d56 : 5
+Merge successful : tech/bsp/remoteproc : a7b9b6d8b0ef8713aea096ed6c6c0fa74db2ed25 : 10
 ------------------------------------------
  ** Merging topic branch: tech/bus/peripherals/tech/bus/peripherals
-Merge successful : tech/bus/peripherals : 8c19ed7289a5e75d811af1ab68c79a971b18a554 : 2
+Merge successful : tech/bus/peripherals : 287f0f5c451d23c09c4c15a25cff6c282ab9b13b : 8
 ------------------------------------------
  ** Merging topic branch: tech/bus/pci/all/tech/bus/pci/all
-Merge successful : tech/bus/pci/all : 6a697f861422a7e8a1e0e189455baffdad08a9c1 : 6
+Merge successful : tech/bus/pci/all : 13f302ced37e4e647c50f669e91aeacc66677a55 : 9
 ------------------------------------------
  ** Merging topic branch: tech/bus/pci/mhi/tech/bus/pci/mhi
-Merge successful : tech/bus/pci/mhi : fb9c1632f424ecdcd7fef1205499a1b64d477cdc : 1
+Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/bus/pci/phy/tech/bus/pci/phy
-Merge failed, manual merge
-No files need merging
-[qcom-next 98edf480f0e9] Merge remote-tracking branch tech/bus/pci/phy into qcom-next
 Merge successful : tech/bus/pci/phy : aaf8ef1234f456bd05343c235d7ad0b921a97220 : 4
 ------------------------------------------
  ** Merging topic branch: tech/bus/pci/pwrctl/tech/bus/pci/pwrctl
@@ -287,7 +296,7 @@ Merge successful : tech/bus/usb/phy : 8c7f91d8f5390117341ccedf03dbca8620e1fede :
 Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/debug/hwtracing/tech/debug/hwtracing
-Merge successful : tech/debug/hwtracing : 87ae82d339bfcb4af6216f36d831240b42fe8d73 : 31
+Merge successful : tech/debug/hwtracing : 25c6a748cd3b64e815a8ee8c741a7adcf3852618 : 30
 ------------------------------------------
  ** Merging topic branch: tech/debug/rdbg/tech/debug/rdbg
 Nothing to merge: Already up to date.
@@ -299,7 +308,7 @@ Nothing to merge: Already up to date.
 Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/pmic/misc/tech/pmic/misc
-Merge successful : tech/pmic/misc : e6525e383cf7a4fe2a6f0b5713045620ef6a9b91 : 9
+Merge successful : tech/pmic/misc : eee20da4b7d0716a8a3b6994d8eee25631aca37e : 1
 ------------------------------------------
  ** Merging topic branch: tech/pmic/regulator/tech/pmic/regulator
 Merge successful : tech/pmic/regulator : 81fc8fbf0f0a02a7b2d855aee574b88bd7d59107 : 6
@@ -311,31 +320,31 @@ Nothing to merge: Already up to date.
 Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/mem/iommu/tech/mem/iommu
-Merge successful : tech/mem/iommu : 43dfdd1471b043f0b8240f9bc79b03f9fe63e598 : 4
+Merge successful : tech/mem/iommu : 1fa98cb308186a3c850369ade7be19f644199f66 : 5
 ------------------------------------------
  ** Merging topic branch: tech/mm/audio/all/tech/mm/audio/all
-Merge successful : tech/mm/audio/all : d38b67b0aa386ae60c62d75dd3a5d2ea06ddeb62 : 14
+Merge successful : tech/mm/audio/all : cab3357f188207843476df34b2a294a9009efa5b : 10
 ------------------------------------------
  ** Merging topic branch: tech/mm/audio/soundwire/tech/mm/audio/soundwire
 Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/mm/camss/tech/mm/camss
-Merge successful : tech/mm/camss : ef80fadce4f21a59dc47963b82dd837fbaf27566 : 20
+Merge successful : tech/mm/camss : b9a32dcb4b4b887590163fbcf3daab7eca5d6ffe : 31
 ------------------------------------------
  ** Merging topic branch: tech/mm/drm/tech/mm/drm
-Merge successful : tech/mm/drm : b17e72357fffb70eaa2577edada34e30557208ee : 12
+Merge successful : tech/mm/drm : 2fbdd74ad152cbed32ae7fb4d4be2bec77f2f192 : 60
 ------------------------------------------
  ** Merging topic branch: tech/mm/fastrpc/tech/mm/fastrpc
-Merge successful : tech/mm/fastrpc : c29b2a8795e0f64836ca9314837d167013d0699e : 5
+Merge successful : tech/mm/fastrpc : e0ba7183d63d0a96142a2eac288975e0393d172c : 9
 ------------------------------------------
  ** Merging topic branch: tech/mm/phy/tech/mm/phy
-Nothing to merge: Already up to date.
+Merge successful : tech/mm/phy : 56ccbf40aba9e63c5917bd041bc51dce8a05a75d : 1
 ------------------------------------------
  ** Merging topic branch: tech/mm/video/tech/mm/video
-Merge successful : tech/mm/video : fa0e48250f91c77370e01fec89db5539ee3401ca : 4
+Merge successful : tech/mm/video : 5ee68afd88991524d9bb3ff979c7928c70b1fa41 : 38
 ------------------------------------------
  ** Merging topic branch: tech/mm/gpu/tech/mm/gpu
-Merge successful : tech/mm/gpu : 9c8e55ded527bf43ab608810515b6c74e251b99f : 2
+Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/mproc/rpmsg/tech/mproc/rpmsg
 Nothing to merge: Already up to date.
@@ -344,22 +353,22 @@ Nothing to merge: Already up to date.
 Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/net/ath/tech/net/ath
-Merge successful : tech/net/ath : f8562ba7c0e1a81bdf56a29fe0caf2fee6c301fe : 2
+Merge successful : tech/net/ath : 3623de023fc23c916a464f2bc9768875d595bbbc : 13
 ------------------------------------------
  ** Merging topic branch: tech/net/eth/tech/net/eth
-Merge successful : tech/net/eth : 49b156fb09e0950aab5d3b4d6f1a92a3a78766d1 : 1
+Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/net/rmnet/tech/net/rmnet
 Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/net/qrtr/tech/net/qrtr
-Merge successful : tech/net/qrtr : 64d75f7e2a793b65d86fd9b35f8d4c40595ba799 : 1
+Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/net/phy/tech/net/phy
 Merge successful : tech/net/phy : a3602e9cbd3dd4519ddc446ddba1261fe4e156bd : 1
 ------------------------------------------
  ** Merging topic branch: tech/net/bluetooth/tech/net/bluetooth
-Merge successful : tech/net/bluetooth : 229e73eda5f991c40b55c97150f2547433b083f2 : 3
+Merge successful : tech/net/bluetooth : 9cca4937e7633b28cefedc4c976f4ca2a0442cb3 : 2
 ------------------------------------------
  ** Merging topic branch: tech/pm/opp/tech/pm/opp
 Nothing to merge: Already up to date.
@@ -368,25 +377,25 @@ Nothing to merge: Already up to date.
 Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/pm/power/tech/pm/power
-Merge successful : tech/pm/power : 25fc1b70fb8b9e86cabdb3f633590a5469e72756 : 9
+Merge successful : tech/pm/power : 2d42c35af66ed0db002e2d2d8481719dd05b804b : 9
 ------------------------------------------
  ** Merging topic branch: tech/pm/thermal/tech/pm/thermal
-Merge successful : tech/pm/thermal : d174ed3bbac5d6ab7ba02a96b0356ea6e57935f8 : 6
+Merge successful : tech/pm/thermal : 90f2db5804218785652b5a88f9d12e798edde273 : 5
 ------------------------------------------
  ** Merging topic branch: tech/security/crypto/tech/security/crypto
-Merge successful : tech/security/crypto : a6ce790e0668cc6f98549c390017c5d1be5d983d : 12
+Merge successful : tech/security/crypto : f030676615c0917a3bb04a3d0f4ca63d7561371b : 14
 ------------------------------------------
  ** Merging topic branch: tech/security/fscrypt/tech/security/fscrypt
 Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/security/ice/tech/security/ice
-Merge successful : tech/security/ice : 5184a0ec45bba44504d3f09f49cb25142f988403 : 15
+Merge successful : tech/security/ice : 1564b829d7522416a7f06506f0c800139c0c1680 : 25
 ------------------------------------------
  ** Merging topic branch: tech/storage/nvmem/tech/storage/nvmem
 Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/storage/phy/tech/storage/phy
-Nothing to merge: Already up to date.
+Merge successful : tech/storage/phy : cf1667fd75c27b29680062ba04eddb466195156b : 1
 ------------------------------------------
  ** Merging topic branch: tech/storage/all/tech/storage/all
 Merge successful : tech/storage/all : e254daed78f7b24bf852df097b78455ca142666a : 1
@@ -395,65 +404,65 @@ Merge successful : tech/storage/all : e254daed78f7b24bf852df097b78455ca142666a :
 Nothing to merge: Already up to date.
 ------------------------------------------
  ** Merging topic branch: tech/all/dt/qcs6490/tech/all/dt/qcs6490
-Merge successful : tech/all/dt/qcs6490 : 5fb16ec0d2e8ab7658e147729274e6ea6f29494b : 16
+Merge successful : tech/all/dt/qcs6490 : 5828ac79f9793009a4c522f6653cd3a005c5e18c : 17
 ------------------------------------------
  ** Merging topic branch: tech/all/dt/qcs9100/tech/all/dt/qcs9100
-Merge successful : tech/all/dt/qcs9100 : 5586aacbb055f02fa9989c1c3b587ec7e13d3b82 : 19
+Merge successful : tech/all/dt/qcs9100 : 8a00fd72654f81e29c115c4d853a6f63f87ee16b : 17
 ------------------------------------------
  ** Merging topic branch: tech/all/dt/qcs8300/tech/all/dt/qcs8300
-Merge successful : tech/all/dt/qcs8300 : 37ae3467288572b7c48fe9e4f1761c8669f68639 : 21
+Merge successful : tech/all/dt/qcs8300 : 90ba0063424e047ccea4f3c96e9786bee0ff18f1 : 15
 ------------------------------------------
  ** Merging topic branch: tech/all/dt/qcs615/tech/all/dt/qcs615
-Merge successful : tech/all/dt/qcs615 : 367314f4728d5949e932dad7ca5dbc27d66844a0 : 27
+Merge successful : tech/all/dt/qcs615 : 9e2f111b1297b44c140e3b9c46a2507a3e162741 : 9
 ------------------------------------------
  ** Merging topic branch: tech/all/dt/agatti/tech/all/dt/agatti
 Merge successful : tech/all/dt/agatti : c828f10cd2c53b7ff2cc061e73b239973ee17bc6 : 1
 ------------------------------------------
  ** Merging topic branch: tech/all/dt/hamoa/tech/all/dt/hamoa
-Merge successful : tech/all/dt/hamoa : 49fad942ea2e8cb32ae046842a58fdec0577b714 : 32
+Merge successful : tech/all/dt/hamoa : 670d0021452a91a99d66fcef03c0af876b85469f : 29
 ------------------------------------------
  ** Merging topic branch: tech/all/dt/glymur/tech/all/dt/glymur
-Merge successful : tech/all/dt/glymur : 3aa6f058d95da70702d42a820eba09bbc6b95050 : 23
+Merge successful : tech/all/dt/glymur : 9251e2445a53df7f065cd6b016a67800b66ca2d4 : 28
 ------------------------------------------
  ** Merging topic branch: tech/all/dt/kaanapali/tech/all/dt/kaanapali
-Merge successful : tech/all/dt/kaanapali : 70486f23c076015ff1cee6616beb776b564cf529 : 23
-------------------------------------------
- ** Merging topic branch: tech/all/dt/pakala/tech/all/dt/pakala
-Merge successful : tech/all/dt/pakala : 86103bc08e13ed2feea53df030b7410456d0f69b : 6
-------------------------------------------
- ** Merging topic branch: tech/all/config/tech/all/config
-Merge successful : tech/all/config : 9050b95eabc118e790acfe2f77dfece9beef819a : 53
-------------------------------------------
- ** Merging topic branch: tech/overlay/dt/tech/overlay/dt
 Merge failed, manual merge
 No files need merging
-[qcom-next 2003a1c586be] Merge remote-tracking branch tech/overlay/dt into qcom-next
-Merge successful : tech/overlay/dt : bbed7cfb3264aadc265375d97a95316c703ecb0f : 24
+[qcom-next 1581d6e86097] Merge remote-tracking branch tech/all/dt/kaanapali into qcom-next
+Merge successful : tech/all/dt/kaanapali : 7436a0814e107c3b27f4ee0369fd130e6f275474 : 9
+------------------------------------------
+ ** Merging topic branch: tech/all/dt/pakala/tech/all/dt/pakala
+Merge successful : tech/all/dt/pakala : 705ac5445b8a756b1cac0a8c4d6b4a621d42b147 : 6
+------------------------------------------
+ ** Merging topic branch: tech/all/config/tech/all/config
+Merge successful : tech/all/config : ff67f6a055a339d05f0386c7e3bcbfbe3cc472a9 : 61
+------------------------------------------
+ ** Merging topic branch: tech/overlay/dt/tech/overlay/dt
+Merge successful : tech/overlay/dt : 88293dfec01cf603c4c8e8d59fe2c37460a2672e : 43
 ------------------------------------------
  ** Merging topic branch: tech/all/workaround/tech/all/workaround
 Merge failed, manual merge
 No files need merging
-[qcom-next 10f0a2f6dae8] Merge remote-tracking branch tech/all/workaround into qcom-next
-Merge successful : tech/all/workaround : c3f9d3b06c59cdca5219c05d5d313fb780541114 : 13
+[qcom-next effa36a44bef] Merge remote-tracking branch tech/all/workaround into qcom-next
+Merge successful : tech/all/workaround : d15f5a17f8be4c6116c1a398ab5e6c3a25852ef1 : 15
 ------------------------------------------
  ** Merging topic branch: tech/mproc/all/tech/mproc/all
-Merge successful : tech/mproc/all : eabd91e71290eab8529edcb342f0bccd7d94c08f : 4
+Merge successful : tech/mproc/all : 0aa90b7d45babe6116bcbb3006ae4636256b6e0f : 3
 ------------------------------------------
  ** Merging topic branch: tech/noup/debug/all/tech/noup/debug/all
-Merge successful : tech/noup/debug/all : 342aeb8c5a4125bff7f8431acf4b6f8b73920dd9 : 15
+Merge successful : tech/noup/debug/all : 53e8e4b953a1812f7460d3d0bbec56eb62d091e3 : 24
 ------------------------------------------
  ** Merging topic branch: tech/hwe/unoq/tech/hwe/unoq
-Merge failed, manual merge
-No files need merging
-[qcom-next b0da29906863] Merge remote-tracking branch tech/hwe/unoq into qcom-next
-Merge successful : tech/hwe/unoq : 7d981feccfaaddb1057ff650e656dcac4e76371b : 16
+Merge successful : tech/hwe/unoq : b2ea57bfc5f97af1b5f7b0d750ae315c60921580 : 5
 ------------------------------------------
  ** Merging topic branch: early/hwe/shikra/drivers/early/hwe/shikra/drivers
-Merge successful : early/hwe/shikra/drivers : 347ed4487fd0ee0230e49b8d918481335843ba6c : 25
+Merge failed, manual merge
+No files need merging
+[qcom-next 6fea5f460f4c] Merge remote-tracking branch early/hwe/shikra/drivers into qcom-next
+Merge successful : early/hwe/shikra/drivers : 74e831cd3e38548fb1916c0fb41cc78649de7ad5 : 69
 ------------------------------------------
  ** Merging topic branch: early/hwe/shikra/dt/early/hwe/shikra/dt
-Merge successful : early/hwe/shikra/dt : 6ae20adae0cce5d240772fc24a45d01a4d6b7935 : 15
-Done, merged 49 topic(s).
-[main c650a68] New rr-cache entries from ci-merge
- 2 files changed, 5759 insertions(+), 8 deletions(-)
- create mode 100644 rr-cache/99839c91a45bfcee801607737b8189856f3cb12e/thisimage.1
+Merge successful : early/hwe/shikra/dt : 8f7e16e4d0ed7a8e661c67589c02f9987abf29dc : 53
+Done, merged 47 topic(s).
+[main 801b793] New rr-cache entries from ci-merge
+ 1 file changed, 1305 insertions(+)
+ create mode 100644 rr-cache/9204ca65db427e68ec14af7c99c55b9e1c35e051/thisimage.2
