@@ -926,7 +926,6 @@ static int fastrpc_map_attach(struct fastrpc_user *fl, int fd,
 		mutex_unlock(&fl->sctx->mutex);
 		goto attach_err;
 	}
-	if (!sess->coherent)
 	table = dma_buf_map_attachment_unlocked(map->attach, DMA_BIDIRECTIONAL);
 	if (IS_ERR(table)) {
 		err = PTR_ERR(table);
