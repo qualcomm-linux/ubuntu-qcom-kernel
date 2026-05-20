@@ -2725,12 +2725,10 @@
 
 		gpu: gpu@3d00000 {
 			compatible = "qcom,adreno-44050a01", "qcom,adreno";
-			reg = <0x0 0x03d00000 0x0 0x40000>,
-			      <0x0 0x03d9e000 0x0 0x2000>,
-			      <0x0 0x03d61000 0x0 0x800>;
+			reg = <0x0 0x03d00000 0x0 0x6c000>,
+			      <0x0 0x03d9e000 0x0 0x2000>;
 			reg-names = "kgsl_3d0_reg_memory",
-				    "cx_mem",
-				    "cx_dbgc";
+				    "cx_mem";
 
 			interrupts = <GIC_SPI 300 IRQ_TYPE_LEVEL_HIGH>;
 
@@ -2741,6 +2739,9 @@
 
 			qcom,gmu = <&gmu>;
 			#cooling-cells = <2>;
+
+			nvmem-cells = <&gpu_speed_bin>;
+			nvmem-cell-names = "speed_bin";
 
 			interconnects = <&gem_noc MASTER_GFX3D QCOM_ICC_TAG_ALWAYS
 					 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
@@ -2758,12 +2759,15 @@
 					opp-hz = /bits/ 64 <222000000>;
 					opp-level = <RPMH_REGULATOR_LEVEL_LOW_SVS_D2>;
 					opp-peak-kBps = <2136718>;
+					opp-supported-hw = <0x0f>;
+					/* ACD is disabled */
 				};
 
 				opp-282000000 {
 					opp-hz = /bits/ 64 <282000000>;
 					opp-level = <RPMH_REGULATOR_LEVEL_LOW_SVS_D1_1>;
 					opp-peak-kBps = <5285156>;
+					opp-supported-hw = <0x0f>;
 					qcom,opp-acd-level = <0xca2e5ffd>;
 				};
 
@@ -2771,6 +2775,7 @@
 					opp-hz = /bits/ 64 <342000000>;
 					opp-level = <RPMH_REGULATOR_LEVEL_LOW_SVS_D1>;
 					opp-peak-kBps = <5285156>;
+					opp-supported-hw = <0x0f>;
 					qcom,opp-acd-level = <0xe22a5ffd>;
 				};
 
@@ -2778,6 +2783,7 @@
 					opp-hz = /bits/ 64 <382000000>;
 					opp-level = <RPMH_REGULATOR_LEVEL_LOW_SVS_D0>;
 					opp-peak-kBps = <5285156>;
+					opp-supported-hw = <0x0f>;
 					qcom,opp-acd-level = <0xa22c5ffd>;
 				};
 
@@ -2785,6 +2791,7 @@
 					opp-hz = /bits/ 64 <422000000>;
 					opp-level = <RPMH_REGULATOR_LEVEL_LOW_SVS>;
 					opp-peak-kBps = <6074218>;
+					opp-supported-hw = <0x0f>;
 					qcom,opp-acd-level = <0xa22c5ffd>;
 				};
 
@@ -2792,6 +2799,7 @@
 					opp-hz = /bits/ 64 <461000000>;
 					opp-level = <RPMH_REGULATOR_LEVEL_LOW_SVS_L0>;
 					opp-peak-kBps = <6074218>;
+					opp-supported-hw = <0x0f>;
 					qcom,opp-acd-level = <0xe82e5ffd>;
 				};
 
@@ -2799,6 +2807,7 @@
 					opp-hz = /bits/ 64 <500000000>;
 					opp-level = <RPMH_REGULATOR_LEVEL_LOW_SVS_L1>;
 					opp-peak-kBps = <6074218>;
+					opp-supported-hw = <0x0f>;
 					qcom,opp-acd-level = <0xe82c5ffd>;
 				};
 
@@ -2806,6 +2815,7 @@
 					opp-hz = /bits/ 64 <539000000>;
 					opp-level = <RPMH_REGULATOR_LEVEL_LOW_SVS_L2>;
 					opp-peak-kBps = <6074218>;
+					opp-supported-hw = <0x0f>;
 					qcom,opp-acd-level = <0xc82b5ffd>;
 				};
 
@@ -2813,6 +2823,7 @@
 					opp-hz = /bits/ 64 <578000000>;
 					opp-level = <RPMH_REGULATOR_LEVEL_SVS>;
 					opp-peak-kBps = <6074218>;
+					opp-supported-hw = <0x0f>;
 					qcom,opp-acd-level = <0xc02c5ffd>;
 				};
 
@@ -2820,6 +2831,7 @@
 					opp-hz = /bits/ 64 <646000000>;
 					opp-level = <RPMH_REGULATOR_LEVEL_SVS_L0>;
 					opp-peak-kBps = <8171875>;
+					opp-supported-hw = <0x0f>;
 					qcom,opp-acd-level = <0xc02c5ffd>;
 				};
 
@@ -2827,6 +2839,7 @@
 					opp-hz = /bits/ 64 <726000000>;
 					opp-level = <RPMH_REGULATOR_LEVEL_SVS_L1>;
 					opp-peak-kBps = <8171875>;
+					opp-supported-hw = <0x0f>;
 					qcom,opp-acd-level = <0x882f5ffd>;
 				};
 
@@ -2834,6 +2847,7 @@
 					opp-hz = /bits/ 64 <826000000>;
 					opp-level = <RPMH_REGULATOR_LEVEL_SVS_L2>;
 					opp-peak-kBps = <12449218>;
+					opp-supported-hw = <0x0f>;
 					qcom,opp-acd-level = <0xa82c5ffd>;
 				};
 
@@ -2841,6 +2855,7 @@
 					opp-hz = /bits/ 64 <902000000>;
 					opp-level = <RPMH_REGULATOR_LEVEL_NOM>;
 					opp-peak-kBps = <12449218>;
+					opp-supported-hw = <0x0f>;
 					qcom,opp-acd-level = <0xa82b5ffd>;
 				};
 
@@ -2848,22 +2863,40 @@
 					opp-hz = /bits/ 64 <967000000>;
 					opp-level = <RPMH_REGULATOR_LEVEL_NOM_L1>;
 					opp-peak-kBps = <12449218>;
+					opp-supported-hw = <0x0f>;
 					qcom,opp-acd-level = <0x882a5ffd>;
 				};
 
-				opp-105000000 {
-					opp-hz = /bits/ 64 <105000000>;
+				opp-1050000000 {
+					opp-hz = /bits/ 64 <1050000000>;
 					opp-level = <RPMH_REGULATOR_LEVEL_TURBO_L1>;
 					opp-peak-kBps = <20832031>;
+					opp-supported-hw = <0x0f>;
 					qcom,opp-acd-level = <0x88295ffd>;
+				};
+
+				opp-1200000000 {
+					opp-hz = /bits/ 64 <1200000000>;
+					opp-level = <RPMH_REGULATOR_LEVEL_TURBO_L3>;
+					opp-peak-kBps = <20832031>;
+					opp-supported-hw = <0x07>;
+					qcom,opp-acd-level = <0xa02e5ffd>;
+				};
+
+				opp-1300000000 {
+					opp-hz = /bits/ 64 <1300000000>;
+					opp-level = <RPMH_REGULATOR_LEVEL_TURBO_L4>;
+					opp-peak-kBps = <20832031>;
+					opp-supported-hw = <0x03>;
+					qcom,opp-acd-level = <0x802d5ffd>;
 				};
 			};
 		};
 
-		gmu: gmu@3d6a000 {
+		gmu: gmu@3d6c000 {
 			compatible = "qcom,adreno-gmu-840.1", "qcom,adreno-gmu";
 
-			reg = <0x0 0x03d37000 0x0 0x68000>;
+			reg = <0x0 0x03d6c000 0x0 0x68000>;
 			reg-names = "gmu";
 
 			interrupts = <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
@@ -2889,6 +2922,7 @@
 			iommus = <&adreno_smmu 5 0x0>;
 
 			qcom,qmp = <&aoss_qmp>;
+
 			operating-points-v2 = <&gmu_opp_table>;
 
 			gmu_opp_table: opp-table {
