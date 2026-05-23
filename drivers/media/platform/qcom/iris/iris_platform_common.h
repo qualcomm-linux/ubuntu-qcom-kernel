@@ -250,14 +250,14 @@ struct iris_firmware_data {
 	unsigned int enc_op_int_buf_tbl_size;
 };
 
-struct iris_firmware_desc {
+struct iris_platform_data {
+	/*
+	 * XXX: remove firmware_data pointer and consider moving
+	 * get_vpu_buffer_size pointer once we have platforms supporting both
+	 * firmware kinds.
+	 */
 	const struct iris_firmware_data *firmware_data;
 	u32 (*get_vpu_buffer_size)(struct iris_inst *inst, enum iris_buffer_type buffer_type);
-	const char *fwname;
-};
-
-struct iris_platform_data {
-	const struct iris_firmware_desc *firmware_desc_gen1, *firmware_desc_gen2;
 
 	const struct vpu_ops *vpu_ops;
 
@@ -279,6 +279,7 @@ struct iris_platform_data {
 	const char * const *controller_rst_tbl;
 	unsigned int controller_rst_tbl_size;
 	u64 dma_mask;
+	const char *fwname;
 	struct iris_fmt *inst_iris_fmts;
 	u32 inst_iris_fmts_size;
 	struct platform_inst_caps *inst_caps;

@@ -170,7 +170,12 @@ int iris_fw_load(struct iris_core *core)
 	const struct tz_cp_config *cp_config;
 	int i, ret;
 
-	ret = iris_load_fw_to_memory(core);
+	ret = of_property_read_string_index(core->dev->of_node, "firmware-name", 0,
+					    &fwpath);
+	if (ret)
+		fwpath = core->iris_platform_data->fwname;
+
+	ret = iris_load_fw_to_memory(core, fwpath);
 	if (ret) {
 		dev_err(core->dev, "firmware download failed %d\n", ret);
 		return ret;
