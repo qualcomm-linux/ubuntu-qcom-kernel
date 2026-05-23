@@ -17,8 +17,6 @@
 #include "iris_core.h"
 #include "iris_firmware.h"
 
-#define IRIS_PAS_ID				9
-
 #define MAX_FIRMWARE_NAME_SIZE	128
 
 /* Detect Gen2 firmware by scanning the blob for:
@@ -100,6 +98,7 @@ static const struct firmware *iris_detect_firmware(struct iris_core *core,
 
 static int iris_load_fw_to_memory(struct iris_core *core)
 {
+	u32 pas_id = core->iris_platform_data->pas_id;
 	struct qcom_scm_pas_context *ctx;
 	const struct firmware *firmware = NULL;
 	struct device *dev = core->dev;
@@ -119,7 +118,7 @@ static int iris_load_fw_to_memory(struct iris_core *core)
 
 	dev = core->fw.dev ? : core->dev;
 
-	ctx = devm_qcom_scm_pas_context_alloc(dev, IRIS_PAS_ID, mem_phys, res_size);
+	ctx = devm_qcom_scm_pas_context_alloc(dev, pas_id, mem_phys, res_size);
 	if (!ctx)
 		return -ENOMEM;
 
@@ -189,7 +188,7 @@ int iris_fw_load(struct iris_core *core)
 						     cp_config->cp_nonpixel_size);
 		if (ret) {
 			dev_err(core->dev, "qcom_scm_mem_protect_video_var failed: %d\n", ret);
-			qcom_scm_pas_shutdown(IRIS_PAS_ID);
+			qcom_scm_pas_shutdown(core->iris_platform_data->pas_id);
 			return ret;
 		}
 	}
