@@ -273,6 +273,8 @@ struct fastrpc_session_ctx {
 	bool used;
 	bool valid;
 	bool coherent;
+	bool allocated;
+	struct mutex mutex;
 };
 
 struct fastrpc_soc_data {
@@ -470,9 +472,18 @@ static void fastrpc_buf_free(struct fastrpc_buf *buf)
 	if (!buf)
 		return;
 
-	dma_free_coherent(buf->dev, buf->size, buf->virt,
-			  fastrpc_ipa_to_dma_addr(buf->fl->cctx, buf->dma_addr));
-	kfree(buf);
+	struct fastrpc_user *fl = buf->fl;
+
+	if (!fl)
+		return;
+	mutex_lock(&fl->sctx->mutex);
+	if (fl->sctx->dev) {
+		dma_free_coherent(buf->dev, buf->size, buf->virt,
+				  fastrpc_ipa_to_dma_addr(buf->fl->cctx,
+							  buf->dma_addr));
+		kfree(buf);
+	}
+	mutex_unlock(&fl->sctx->mutex);
 }
 
 static int __fastrpc_buf_alloc(struct fastrpc_user *fl, struct device *dev,
@@ -541,8 +552,10 @@ static void fastrpc_channel_ctx_free(struct kref *ref)
 	struct fastrpc_channel_ctx *cctx;
 
 	cctx = container_of(ref, struct fastrpc_channel_ctx, refcount);
-	for (int i = 0; i < FASTRPC_MAX_SESSIONS; i++)
-		mutex_destroy(&cctx->session[i].mutex);
+	for (int i = 0; i < FASTRPC_MAX_SESSIONS; i++) {
+		if (cctx->session[i].allocated)
+			mutex_destroy(&cctx->session[i].mutex);
+	}
 
 	kfree(cctx);
 }
@@ -2494,6 +2507,8 @@ static int fastrpc_cb_probe(struct platform_device *pdev)
 	sess->dev = dev;
 	sess->coherent = of_property_read_bool(dev->of_node, "dma-coherent");
 	dev_set_drvdata(dev, sess);
+	mutex_init(&sess->mutex);
+	sess->allocated = true;
 
 	if (cctx->domain_id == CDSP_DOMAIN_ID)
 		dma_bits = cctx->soc_data->dma_addr_bits_cdsp;
@@ -2510,6 +2525,7 @@ static int fastrpc_cb_probe(struct platform_device *pdev)
 			dup_sess = &cctx->session[cctx->sesscount++];
 			memcpy(dup_sess, sess, sizeof(*dup_sess));
 			mutex_init(&dup_sess->mutex);
+			dup_sess->allocated = true;
 		}
 	}
 	spin_unlock_irqrestore(&cctx->lock, flags);
