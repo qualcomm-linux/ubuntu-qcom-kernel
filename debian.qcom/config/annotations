@@ -301,6 +301,10 @@ CONFIG_CHARGER_SC2731                           policy<{'arm64': '-'}>
 CONFIG_CIX_MBOX                                 policy<{'arm64': '-'}>
 CONFIG_CLKSRC_STM32_LP                          policy<{'arm64': '-'}>
 CONFIG_CLK_ACTIONS                              policy<{'arm64': '-'}>
+CONFIG_CLK_ELIZA_DISPCC                         policy<{'arm64-qcom': 'y', 'arm64-qcom-rt': 'm'}>
+CONFIG_CLK_ELIZA_GCC                            policy<{'arm64-qcom': 'y', 'arm64-qcom-rt': 'm'}>
+CONFIG_CLK_ELIZA_TCSRCC                         policy<{'arm64-qcom': 'y', 'arm64-qcom-rt': 'm'}>
+CONFIG_CLK_GLYMUR_CAMCC                         policy<{'arm64-qcom': 'y', 'arm64-qcom-rt': 'm'}>
 CONFIG_CLK_GLYMUR_GCC                           policy<{'arm64': 'y'}>
 CONFIG_CLK_GLYMUR_GPUCC                         policy<{'arm64': 'y'}>
 CONFIG_CLK_GLYMUR_VIDEOCC                       policy<{'arm64': 'y'}>
@@ -317,6 +321,7 @@ CONFIG_CLK_INTEL_SOCFPGA64                      policy<{'arm64': '-'}>
 CONFIG_CLK_KAANAPALI_TCSRCC                     policy<{'arm64': 'n'}>
 CONFIG_CLK_LS1028A_PLLDIG                       policy<{'arm64': '-'}>
 CONFIG_CLK_MA35D1                               policy<{'arm64': '-'}>
+CONFIG_CLK_NORD_GCC                             policy<{'arm64': 'm'}>
 CONFIG_CLK_OWL_S500                             policy<{'arm64': '-'}>
 CONFIG_CLK_OWL_S700                             policy<{'arm64': '-'}>
 CONFIG_CLK_OWL_S900                             policy<{'arm64': '-'}>
@@ -368,7 +373,9 @@ CONFIG_CLK_RK3588                               policy<{'arm64': '-'}>
 CONFIG_CLK_RV1126B                              policy<{'arm64': '-'}>
 CONFIG_CLK_RZG2L                                policy<{'arm64': '-'}>
 CONFIG_CLK_RZV2H                                policy<{'arm64': '-'}>
+CONFIG_CLK_SHIKRA_DISPCC                        policy<{'arm64': 'm'}>
 CONFIG_CLK_SHIKRA_GCC                           policy<{'arm64': 'y'}>
+CONFIG_CLK_SHIKRA_GPUCC                         policy<{'arm64': 'm'}>
 CONFIG_CLK_SOPHGO_CV1800                        policy<{'arm64': '-'}>
 CONFIG_CLK_SOPHGO_SG2042_CLKGEN                 policy<{'arm64': '-'}>
 CONFIG_CLK_SOPHGO_SG2042_PLL                    policy<{'arm64': '-'}>
@@ -647,6 +654,7 @@ CONFIG_DEBUG_MUTEXES                            policy<{'arm64': 'n', 'arm64-qco
 CONFIG_DEBUG_RWSEMS                             policy<{'arm64': 'n', 'arm64-qcom-rt': '-'}>
 CONFIG_DETECT_HUNG_TASK_BLOCKER                 policy<{'arm64': 'y', 'arm64-qcom-rt': '-'}>
 CONFIG_DEVFREQ_EVENT_ROCKCHIP_DFI               policy<{'arm64': '-'}>
+CONFIG_DEVFREQ_GOV_REMOTE                       policy<{'arm64': 'y'}>
 CONFIG_DEV_DAX                                  policy<{'arm64': 'm', 'arm64-qcom-rt': '-'}>
 CONFIG_DEV_DAX_CXL                              policy<{'arm64': 'm', 'arm64-qcom-rt': '-'}>
 CONFIG_DEV_DAX_KMEM                             policy<{'arm64': 'm', 'arm64-qcom-rt': '-'}>
@@ -723,6 +731,7 @@ CONFIG_DRM_NOUVEAU_SIL164                       policy<{'arm64': '-'}>
 CONFIG_DRM_NOUVEAU_SVM                          policy<{'arm64': '-'}>
 CONFIG_DRM_NOVA                                 policy<{'arm64': 'n'}>
 CONFIG_DRM_PANEL_BACKLIGHT_QUIRKS               policy<{'arm64': '-'}>
+CONFIG_DRM_PANEL_DLC0697                        policy<{'arm64': 'y'}>
 CONFIG_DRM_PL111                                policy<{'arm64': 'n'}>
 CONFIG_DRM_RADEON                               policy<{'arm64': 'n'}>
 CONFIG_DRM_RADEON_USERPTR                       policy<{'arm64': '-'}>
@@ -797,6 +806,8 @@ CONFIG_DWMAC_SUNXI                              policy<{'arm64': '-'}>
 CONFIG_DWMAC_TEGRA                              policy<{'arm64': '-'}>
 CONFIG_DWMAC_VISCONTI                           policy<{'arm64': '-'}>
 CONFIG_DW_APB_ICTL                              policy<{'arm64': '-'}>
+CONFIG_EC_LENOVO_YOGA_SLIM7X                    policy<{'arm64': '-'}>
+CONFIG_EC_QCOM_HAMOA                            policy<{'arm64': 'y'}>
 CONFIG_EDAC_ALTERA                              policy<{'arm64': '-'}>
 CONFIG_EDAC_ALTERA_ETHERNET                     policy<{'arm64': '-'}>
 CONFIG_EDAC_ALTERA_NAND                         policy<{'arm64': '-'}>
@@ -1025,6 +1036,7 @@ CONFIG_INTERCONNECT_QCOM_KAANAPALI              policy<{'arm64': 'y'}>
 CONFIG_INTERCONNECT_QCOM_QCS615                 policy<{'arm64': 'y'}>
 CONFIG_INTERCONNECT_QCOM_QCS8300                policy<{'arm64': 'y'}>
 CONFIG_INTERCONNECT_QCOM_SDM845                 policy<{'arm64': 'y'}>
+CONFIG_INTERCONNECT_QCOM_SHIKRA                 policy<{'arm64': 'm'}>
 CONFIG_INTERCONNECT_QCOM_SM8450                 policy<{'arm64': 'y'}>
 CONFIG_INTERCONNECT_QCOM_SM8550                 policy<{'arm64': 'y'}>
 CONFIG_INTERCONNECT_QCOM_SM8650                 policy<{'arm64': 'y'}>
@@ -1765,6 +1777,7 @@ CONFIG_QCOM_QMI_HELPERS                         policy<{'arm64': 'y'}>
 CONFIG_QCOM_QPS615_PCIE_SWITCH                  policy<{'arm64': '-'}>
 CONFIG_QCOM_RPMPD                               policy<{'arm64': 'y'}>
 CONFIG_QCOM_RPROC_MINIDUMP                      policy<{'arm64': '-'}>
+CONFIG_QCOM_SCMI_GENERIC_EXT                    policy<{'arm64': 'y'}>
 CONFIG_QCOM_SCM_ADDON                           policy<{'arm64': '-'}>
 CONFIG_QCOM_SCM_DOWNLOAD_MODE_DEFAULT           policy<{'arm64': '-'}>
 CONFIG_QCOM_SECURE_BUFFER                       policy<{'arm64': '-'}>
@@ -1928,6 +1941,7 @@ CONFIG_RTC_DRV_XGENE                            policy<{'arm64': '-'}>
 CONFIG_RTD119X_WATCHDOG                         policy<{'arm64': '-'}>
 CONFIG_RTK_SYSTIMER                             policy<{'arm64': '-'}>
 CONFIG_RTSN                                     policy<{'arm64': '-'}>
+CONFIG_RUSTC_VERSION_TEXT                       policy<{'arm64': '"rustc 1.93.1 (01f6ddf75 2026-02-11)"'}>
 CONFIG_RZG2L_ADC                                policy<{'arm64': '-'}>
 CONFIG_RZG2L_THERMAL                            policy<{'arm64': '-'}>
 CONFIG_RZG3E_THERMAL                            policy<{'arm64': '-'}>
@@ -1940,6 +1954,7 @@ CONFIG_S32G_WDT                                 policy<{'arm64': '-'}>
 CONFIG_SATA_AHCI_SEATTLE                        policy<{'arm64': '-'}>
 CONFIG_SATA_RCAR                                policy<{'arm64': '-'}>
 CONFIG_SC27XX_ADC                               policy<{'arm64': '-'}>
+CONFIG_SCMI_QCOM_MEMLAT_DEVFREQ                 policy<{'arm64': 'y'}>
 CONFIG_SCSI_UFS_AMD_VERSAL2                     policy<{'arm64': '-'}>
 CONFIG_SCSI_UFS_HISI                            policy<{'arm64': '-'}>
 CONFIG_SCSI_UFS_MEDIATEK                        policy<{'arm64': '-'}>
@@ -2198,6 +2213,7 @@ CONFIG_SND_SOC_TI_UDMA_PCM                      policy<{'arm64': '-'}>
 CONFIG_SND_SOC_WM8994                           policy<{'arm64': '-'}>
 CONFIG_SND_SOC_WM9712                           policy<{'arm64': '-'}>
 CONFIG_SND_SOC_WM_HUBS                          policy<{'arm64': '-'}>
+CONFIG_SND_SOC_WSA885X_I2C                      policy<{'arm64': 'y'}>
 CONFIG_SND_SUN4I_CODEC                          policy<{'arm64': '-'}>
 CONFIG_SND_SUN4I_I2S                            policy<{'arm64': '-'}>
 CONFIG_SND_SUN4I_SPDIF                          policy<{'arm64': '-'}>
