@@ -39,7 +39,7 @@
 
 		cpu0: cpu@0 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-2";
 			reg = <0x0 0x0>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd0>, <&scmi_perf 0>;
@@ -55,7 +55,7 @@
 
 		cpu1: cpu@100 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-2";
 			reg = <0x0 0x100>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd1>, <&scmi_perf 0>;
@@ -65,7 +65,7 @@
 
 		cpu2: cpu@200 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-2";
 			reg = <0x0 0x200>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd2>, <&scmi_perf 0>;
@@ -75,7 +75,7 @@
 
 		cpu3: cpu@300 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-2";
 			reg = <0x0 0x300>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd3>, <&scmi_perf 0>;
@@ -85,7 +85,7 @@
 
 		cpu4: cpu@400 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-2";
 			reg = <0x0 0x400>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd4>, <&scmi_perf 0>;
@@ -95,7 +95,7 @@
 
 		cpu5: cpu@500 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-2";
 			reg = <0x0 0x500>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd5>, <&scmi_perf 0>;
@@ -105,7 +105,7 @@
 
 		cpu6: cpu@10000 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-1";
 			reg = <0x0 0x10000>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd6>, <&scmi_perf 1>;
@@ -121,7 +121,7 @@
 
 		cpu7: cpu@10100 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-1";
 			reg = <0x0 0x10100>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd7>, <&scmi_perf 1>;
@@ -131,7 +131,7 @@
 
 		cpu8: cpu@10200 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-1";
 			reg = <0x0 0x10200>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd8>, <&scmi_perf 1>;
@@ -141,7 +141,7 @@
 
 		cpu9: cpu@10300 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-1";
 			reg = <0x0 0x10300>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd9>, <&scmi_perf 1>;
@@ -151,7 +151,7 @@
 
 		cpu10: cpu@10400 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-1";
 			reg = <0x0 0x10400>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd10>, <&scmi_perf 1>;
@@ -161,7 +161,7 @@
 
 		cpu11: cpu@10500 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-1";
 			reg = <0x0 0x10500>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd11>, <&scmi_perf 1>;
@@ -171,7 +171,7 @@
 
 		cpu12: cpu@20000 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-1";
 			reg = <0x0 0x20000>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd12>, <&scmi_perf 2>;
@@ -187,7 +187,7 @@
 
 		cpu13: cpu@20100 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-1";
 			reg = <0x0 0x20100>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd13>, <&scmi_perf 2>;
@@ -197,7 +197,7 @@
 
 		cpu14: cpu@20200 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-1";
 			reg = <0x0 0x20200>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd14>, <&scmi_perf 2>;
@@ -207,7 +207,7 @@
 
 		cpu15: cpu@20300 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-1";
 			reg = <0x0 0x20300>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd15>, <&scmi_perf 2>;
@@ -217,7 +217,7 @@
 
 		cpu16: cpu@20400 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-1";
 			reg = <0x0 0x20400>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd16>, <&scmi_perf 2>;
@@ -227,7 +227,7 @@
 
 		cpu17: cpu@20500 {
 			device_type = "cpu";
-			compatible = "qcom,oryon";
+			compatible = "qcom,oryon-2-1";
 			reg = <0x0 0x20500>;
 			enable-method = "psci";
 			power-domains = <&cpu_pd17>, <&scmi_perf 2>;
@@ -288,7 +288,7 @@
 				};
 			};
 
-			cluster2 {
+			cpu_map_cluster2: cluster2 {
 				core0 {
 					cpu = <&cpu12>;
 				};
@@ -2447,6 +2447,28 @@
 			status = "disabled";
 		};
 
+		mdss_dp3_phy: phy@faac00 {
+			compatible = "qcom,glymur-dp-phy";
+			reg = <0x0 0x00faac00 0x0 0x1d0>,
+			      <0x0 0x00faa400 0x0 0x128>,
+			      <0x0 0x00faa800 0x0 0x128>,
+			      <0x0 0x00faa000 0x0 0x358>;
+
+			clocks = <&dispcc DISP_CC_MDSS_DPTX3_AUX_CLK>,
+				 <&dispcc DISP_CC_MDSS_AHB_CLK>,
+				 <&tcsr TCSR_EDP_CLKREF_EN>;
+			clock-names = "aux",
+				      "cfg_ahb",
+				      "ref";
+
+			power-domains = <&rpmhpd RPMHPD_MX>;
+
+			#clock-cells = <1>;
+			#phy-cells = <0>;
+
+			status = "disabled";
+		};
+
 		usb_0_hsphy: phy@fd3000 {
 			compatible = "qcom,glymur-m31-eusb2-phy",
 				     "qcom,sm8750-m31-eusb2-phy";
@@ -2593,27 +2615,7 @@
 				};
 			};
 		};
-		mdss_dp3_phy: phy@faac00 {
-			compatible = "qcom,glymur-dp-phy";
-			reg = <0 0x00faac00 0 0x1d0>,
-			      <0 0x00faa400 0 0x128>,
-			      <0 0x00faa800 0 0x128>,
-			      <0 0x00faa000 0 0x358>;
 
-			clocks = <&dispcc DISP_CC_MDSS_DPTX3_AUX_CLK>,
-				 <&dispcc DISP_CC_MDSS_AHB_CLK>,
-				 <&tcsr TCSR_EDP_CLKREF_EN>;
-			clock-names = "aux",
-				      "cfg_ahb",
-				      "ref";
-
-			power-domains = <&rpmhpd RPMHPD_MX>;
-
-			#clock-cells = <1>;
-			#phy-cells = <0>;
-
-			status = "disabled";
-		};
 
 		/* cluster0 */
 		bwmon_cluster0: pmu@100c400 {
@@ -2673,6 +2675,10 @@
 				opp-10 {
 					opp-peak-kBps = <19046400>;
 				};
+
+				opp-11 {
+					opp-peak-kBps = <21332000>;
+				};
 			};
 		};
 
@@ -2701,7 +2707,6 @@
 
 			operating-points-v2 = <&cpu_bwmon_opp_table>;
 		};
-
 		cnoc_main: interconnect@1500000 {
 			compatible = "qcom,glymur-cnoc-main";
 			reg = <0x0 0x01500000 0x0 0x17080>;
@@ -4434,7 +4439,7 @@
 						reg = <3>;
 
 						iommus = <&apps_smmu 0x1003 0x80>,
-							 <&apps_smmu 0x1043 0x20>;
+							 <&apps_smmu 0x1063 0x20>;
 						dma-coherent;
 					};
 
@@ -4443,7 +4448,7 @@
 						reg = <4>;
 
 						iommus = <&apps_smmu 0x1004 0x80>,
-							 <&apps_smmu 0x1044 0x20>;
+							 <&apps_smmu 0x1064 0x20>;
 						dma-coherent;
 					};
 
@@ -4452,7 +4457,7 @@
 						reg = <5>;
 
 						iommus = <&apps_smmu 0x1005 0x80>,
-							 <&apps_smmu 0x1045 0x20>;
+							 <&apps_smmu 0x1065 0x20>;
 						dma-coherent;
 					};
 
@@ -4461,7 +4466,7 @@
 						reg = <6>;
 
 						iommus = <&apps_smmu 0x1006 0x80>,
-							 <&apps_smmu 0x1046 0x20>;
+							 <&apps_smmu 0x1066 0x20>;
 						dma-coherent;
 					};
 
@@ -4480,7 +4485,7 @@
 						reg = <8>;
 
 						iommus = <&apps_smmu 0x1008 0x80>,
-							 <&apps_smmu 0x1048 0x20>;
+							 <&apps_smmu 0x1068 0x20>;
 						dma-coherent;
 					};
 				};
@@ -5373,8 +5378,8 @@
 
 			mdss_mdp: display-controller@ae01000 {
 				compatible = "qcom,glymur-dpu";
-				reg = <0 0x0ae01000 0 0x93000>,
-				      <0 0x0aeb0000 0 0x2008>;
+				reg = <0x0 0x0ae01000 0x0 0x93000>,
+				      <0x0 0x0aeb0000 0x0 0x3000>;
 				reg-names = "mdp",
 					    "vbif";
 
@@ -5435,6 +5440,11 @@
 				mdp_opp_table: opp-table {
 					compatible = "operating-points-v2";
 
+					opp-156000000 {
+						opp-hz = /bits/ 64 <156000000>;
+						required-opps = <&rpmhpd_opp_low_svs_d1>;
+					};
+
 					opp-205000000 {
 						opp-hz = /bits/ 64 <205000000>;
 						required-opps = <&rpmhpd_opp_low_svs>;
@@ -5459,16 +5469,30 @@
 						opp-hz = /bits/ 64 <600000000>;
 						required-opps = <&rpmhpd_opp_nom_l1>;
 					};
+
+					opp-660000000 {
+						opp-hz = /bits/ 64 <660000000>;
+						required-opps = <&rpmhpd_opp_turbo>;
+					};
+
+					opp-717000000 {
+						opp-hz = /bits/ 64 <717000000>;
+						required-opps = <&rpmhpd_opp_turbo_l1>;
+					};
 				};
 			};
 
 			mdss_dp0: displayport-controller@af54000 {
 				compatible = "qcom,glymur-dp";
-				reg = <0x0 0xaf54000 0x0 0x104>,
-				      <0x0 0xaf54200 0x0 0xc0>,
-				      <0x0 0xaf55000 0x0 0x770>,
-				      <0x0 0xaf56000 0x0 0x9c>,
-				      <0x0 0xaf57000 0x0 0x9c>;
+				reg = <0x0 0xaf54000 0x0 0x200>,
+				      <0x0 0xaf54200 0x0 0x200>,
+				      <0x0 0xaf55000 0x0 0xc00>,
+				      <0x0 0xaf56000 0x0 0x400>,
+				      <0x0 0xaf57000 0x0 0x400>,
+				      <0x0 0xaf58000 0x0 0x400>,
+				      <0x0 0xaf59000 0x0 0x400>,
+				      <0x0 0xaf5a000 0x0 0x600>,
+				      <0x0 0xaf5b000 0x0 0x600>;
 
 				interrupts-extended = <&mdss 12>;
 
@@ -5482,7 +5506,8 @@
 					      "core_aux",
 					      "ctrl_link",
 					      "ctrl_link_iface",
-					      "stream_pixel";
+					      "stream_pixel",
+					      "stream_1_pixel";
 
 				assigned-clocks = <&dispcc DISP_CC_MDSS_DPTX0_LINK_CLK_SRC>,
 						  <&dispcc DISP_CC_MDSS_DPTX0_PIXEL0_CLK_SRC>,
@@ -5526,11 +5551,6 @@
 				mdss_dp0_opp_table: opp-table {
 					compatible = "operating-points-v2";
 
-					opp-192000000 {
-						opp-hz = /bits/ 64 <192000000>;
-						required-opps = <&rpmhpd_opp_low_svs_d1>;
-					};
-
 					opp-270000000 {
 						opp-hz = /bits/ 64 <270000000>;
 						required-opps = <&rpmhpd_opp_low_svs>;
@@ -5538,6 +5558,11 @@
 
 					opp-540000000 {
 						opp-hz = /bits/ 64 <540000000>;
+						required-opps = <&rpmhpd_opp_svs>;
+					};
+
+					opp-675000000 {
+						opp-hz = /bits/ 64 <675000000>;
 						required-opps = <&rpmhpd_opp_svs_l1>;
 					};
 
@@ -5550,11 +5575,15 @@
 
 			mdss_dp1: displayport-controller@af5c000 {
 				compatible = "qcom,glymur-dp";
-				reg = <0x0 0xaf5c000 0x0 0x104>,
-				      <0x0 0xaf5c200 0x0 0xc0>,
-				      <0x0 0xaf5d000 0x0 0x770>,
-				      <0x0 0xaf5e000 0x0 0x9c>,
-				      <0x0 0xaf5f000 0x0 0x9c>;
+				reg = <0x0 0xaf5c000 0x0 0x200>,
+				      <0x0 0xaf5c200 0x0 0x200>,
+				      <0x0 0xaf5d000 0x0 0xc00>,
+				      <0x0 0xaf5e000 0x0 0x400>,
+				      <0x0 0xaf5f000 0x0 0x400>,
+				      <0x0 0xaf60000 0x0 0x400>,
+				      <0x0 0xaf61000 0x0 0x400>,
+				      <0x0 0xaf62000 0x0 0x600>,
+				      <0x0 0xaf63000 0x0 0x600>;
 
 				interrupts-extended = <&mdss 13>;
 
@@ -5568,7 +5597,8 @@
 					      "core_aux",
 					      "ctrl_link",
 					      "ctrl_link_iface",
-					      "stream_pixel";
+					      "stream_pixel",
+					      "stream_1_pixel";
 
 				assigned-clocks = <&dispcc DISP_CC_MDSS_DPTX1_LINK_CLK_SRC>,
 						  <&dispcc DISP_CC_MDSS_DPTX1_PIXEL0_CLK_SRC>,
@@ -5612,11 +5642,15 @@
 
 			mdss_dp2: displayport-controller@af64000 {
 				compatible = "qcom,glymur-dp";
-				reg = <0x0 0x0af64000 0x0 0x104>,
-				      <0x0 0x0af64200 0x0 0xc0>,
-				      <0x0 0x0af65000 0x0 0x770>,
-				      <0x0 0x0af66000 0x0 0x9c>,
-				      <0x0 0x0af67000 0x0 0x9c>;
+				reg = <0x0 0x0af64000 0x0 0x200>,
+				      <0x0 0x0af64200 0x0 0x200>,
+				      <0x0 0x0af65000 0x0 0xc00>,
+				      <0x0 0x0af66000 0x0 0x400>,
+				      <0x0 0x0af67000 0x0 0x400>,
+				      <0x0 0x0af68000 0x0 0x400>,
+				      <0x0 0x0af69000 0x0 0x400>,
+				      <0x0 0x0af6a000 0x0 0x600>,
+				      <0x0 0x0af6b000 0x0 0x600>;
 
 				interrupts-extended = <&mdss 14>;
 
@@ -5630,7 +5664,8 @@
 					      "core_aux",
 					      "ctrl_link",
 					      "ctrl_link_iface",
-					      "stream_pixel";
+					      "stream_pixel",
+					      "stream_1_pixel";
 
 				assigned-clocks = <&dispcc DISP_CC_MDSS_DPTX2_LINK_CLK_SRC>,
 						  <&dispcc DISP_CC_MDSS_DPTX2_PIXEL0_CLK_SRC>,
@@ -5673,11 +5708,15 @@
 
 			mdss_dp3: displayport-controller@af6c000 {
 				compatible = "qcom,glymur-dp";
-				reg = <0 0x0af6c000 0 0x200>,
-				      <0 0x0af6c200 0 0x200>,
-				      <0 0x0af6d000 0 0xc00>,
-				      <0 0x0af6e000 0 0x400>,
-				      <0 0x0af6f000 0 0x400>;
+				reg = <0x0 0x0af6c000 0x0 0x200>,
+				      <0x0 0x0af6c200 0x0 0x200>,
+				      <0x0 0x0af6d000 0x0 0xc00>,
+				      <0x0 0x0af6e000 0x0 0x400>,
+				      <0x0 0x0af6f000 0x0 0x400>,
+				      <0x0 0x0af70000 0x0 0x400>,
+				      <0x0 0x0af71000 0x0 0x400>,
+				      <0x0 0x0af72000 0x0 0x600>,
+				      <0x0 0x0af73000 0x0 0x600>;
 
 				interrupts-extended = <&mdss 15>;
 
@@ -8131,7 +8170,7 @@
 			compatible = "qcom,glymur-cdsp-pas", "qcom,sm8550-cdsp-pas";
 			reg = <0x0 0x32300000 0x0 0x10000>;
 
-			iommus = <&apps_smmu 0x2000 0x400>;
+			iommus = <&apps_smmu 0x2400 0x400>;
 
 			interrupts-extended = <&intc GIC_SPI 578 IRQ_TYPE_EDGE_RISING>,
 					      <&smp2p_cdsp_in 0 IRQ_TYPE_EDGE_RISING>,
@@ -8186,7 +8225,7 @@
 						compatible = "qcom,fastrpc-compute-cb";
 						reg = <1>;
 
-						iommus = <&apps_smmu 0x2001 0x440>,
+						iommus = <&apps_smmu 0x2401 0x440>,
 							 <&apps_smmu 0x1961 0x0>,
 							 <&apps_smmu 0x19c1 0x0>;
 						dma-coherent;
@@ -8196,7 +8235,7 @@
 						compatible = "qcom,fastrpc-compute-cb";
 						reg = <2>;
 
-						iommus = <&apps_smmu 0x2002 0x440>,
+						iommus = <&apps_smmu 0x2402 0x440>,
 							 <&apps_smmu 0x1962 0x0>,
 							 <&apps_smmu 0x19c2 0x0>;
 						dma-coherent;
@@ -8206,7 +8245,7 @@
 						compatible = "qcom,fastrpc-compute-cb";
 						reg = <3>;
 
-						iommus = <&apps_smmu 0x2003 0x440>,
+						iommus = <&apps_smmu 0x2403 0x440>,
 							 <&apps_smmu 0x1963 0x0>,
 							 <&apps_smmu 0x19c3 0x0>;
 						dma-coherent;
@@ -8216,7 +8255,7 @@
 						compatible = "qcom,fastrpc-compute-cb";
 						reg = <4>;
 
-						iommus = <&apps_smmu 0x2004 0x440>,
+						iommus = <&apps_smmu 0x2404 0x440>,
 							 <&apps_smmu 0x1964 0x0>,
 							 <&apps_smmu 0x19c4 0x0>;
 						dma-coherent;
@@ -8226,7 +8265,7 @@
 						compatible = "qcom,fastrpc-compute-cb";
 						reg = <5>;
 
-						iommus = <&apps_smmu 0x2005 0x440>,
+						iommus = <&apps_smmu 0x2405 0x440>,
 							 <&apps_smmu 0x1965 0x0>,
 							 <&apps_smmu 0x19c5 0x0>;
 						dma-coherent;
@@ -8236,7 +8275,7 @@
 						compatible = "qcom,fastrpc-compute-cb";
 						reg = <6>;
 
-						iommus = <&apps_smmu 0x2006 0x440>,
+						iommus = <&apps_smmu 0x2406 0x440>,
 							 <&apps_smmu 0x1966 0x0>,
 							 <&apps_smmu 0x19c6 0x0>;
 						dma-coherent;
@@ -8246,7 +8285,7 @@
 						compatible = "qcom,fastrpc-compute-cb";
 						reg = <7>;
 
-						iommus = <&apps_smmu 0x2007 0x440>,
+						iommus = <&apps_smmu 0x2407 0x440>,
 							 <&apps_smmu 0x1967 0x0>,
 							 <&apps_smmu 0x19c7 0x0>;
 						dma-coherent;
@@ -8256,7 +8295,7 @@
 						compatible = "qcom,fastrpc-compute-cb";
 						reg = <8>;
 
-						iommus = <&apps_smmu 0x2008 0x440>,
+						iommus = <&apps_smmu 0x2408 0x440>,
 							 <&apps_smmu 0x1968 0x0>,
 							 <&apps_smmu 0x19c8 0x0>;
 						dma-coherent;
@@ -8268,7 +8307,7 @@
 						compatible = "qcom,fastrpc-compute-cb";
 						reg = <10>;
 
-						iommus = <&apps_smmu 0x200c 0x440>,
+						iommus = <&apps_smmu 0x240c 0x440>,
 							 <&apps_smmu 0x196c 0x0>,
 							 <&apps_smmu 0x19cc 0x0>;
 						dma-coherent;
@@ -8278,7 +8317,7 @@
 						compatible = "qcom,fastrpc-compute-cb";
 						reg = <11>;
 
-						iommus = <&apps_smmu 0x200d 0x440>,
+						iommus = <&apps_smmu 0x240d 0x440>,
 							 <&apps_smmu 0x196d 0x0>,
 							 <&apps_smmu 0x19cd 0x0>;
 						dma-coherent;
@@ -8288,7 +8327,7 @@
 						compatible = "qcom,fastrpc-compute-cb";
 						reg = <12>;
 
-						iommus = <&apps_smmu 0x200e 0x440>,
+						iommus = <&apps_smmu 0x240e 0x440>,
 							 <&apps_smmu 0x196e 0x0>,
 							 <&apps_smmu 0x19ce 0x0>;
 						dma-coherent;
@@ -8567,7 +8606,7 @@
 			};
 		};
 
-		video-0-thermal {
+		thermal_video_0: video-0-thermal {
 			thermal-sensors = <&tsens1 7>;
 
 			trips {
@@ -8579,7 +8618,7 @@
 			};
 		};
 
-		video-1-thermal {
+		thermal_video_1: video-1-thermal {
 			thermal-sensors = <&tsens1 8>;
 
 			trips {
@@ -8855,7 +8894,7 @@
 			};
 		};
 
-		cpu-2-0-0-thermal {
+		thermal_cpu_2_0_0: cpu-2-0-0-thermal {
 			thermal-sensors = <&tsens4 1>;
 
 			trips {
@@ -8867,7 +8906,7 @@
 			};
 		};
 
-		cpu-2-0-1-thermal {
+		thermal_cpu_2_0_1: cpu-2-0-1-thermal {
 			thermal-sensors = <&tsens4 2>;
 
 			trips {
@@ -8879,7 +8918,7 @@
 			};
 		};
 
-		cpu-2-1-0-thermal {
+		thermal_cpu_2_1_0: cpu-2-1-0-thermal {
 			thermal-sensors = <&tsens4 3>;
 
 			trips {
@@ -8891,7 +8930,7 @@
 			};
 		};
 
-		cpu-2-1-1-thermal {
+		thermal_cpu_2_1_1: cpu-2-1-1-thermal {
 			thermal-sensors = <&tsens4 4>;
 
 			trips {
@@ -8903,7 +8942,7 @@
 			};
 		};
 
-		cpu-2-2-0-thermal {
+		thermal_cpu_2_2_0: cpu-2-2-0-thermal {
 			thermal-sensors = <&tsens4 5>;
 
 			trips {
@@ -8915,7 +8954,7 @@
 			};
 		};
 
-		cpu-2-2-1-thermal {
+		thermal_cpu_2_2_1: cpu-2-2-1-thermal {
 			thermal-sensors = <&tsens4 6>;
 
 			trips {
@@ -8927,7 +8966,7 @@
 			};
 		};
 
-		cpu-2-3-0-thermal {
+		thermal_cpu_2_3_0: cpu-2-3-0-thermal {
 			thermal-sensors = <&tsens4 7>;
 
 			trips {
@@ -8939,7 +8978,7 @@
 			};
 		};
 
-		cpu-2-3-1-thermal {
+		thermal_cpu_2_3_1: cpu-2-3-1-thermal {
 			thermal-sensors = <&tsens4 8>;
 
 			trips {
@@ -8951,7 +8990,7 @@
 			};
 		};
 
-		cpu-2-4-0-thermal {
+		thermal_cpu_2_4_0: cpu-2-4-0-thermal {
 			thermal-sensors = <&tsens4 9>;
 
 			trips {
@@ -8963,7 +9002,7 @@
 			};
 		};
 
-		cpu-2-4-1-thermal {
+		thermal_cpu_2_4_1: cpu-2-4-1-thermal {
 			thermal-sensors = <&tsens4 10>;
 
 			trips {
@@ -8975,7 +9014,7 @@
 			};
 		};
 
-		cpu-2-5-0-thermal {
+		thermal_cpu_2_5_0: cpu-2-5-0-thermal {
 			thermal-sensors = <&tsens4 11>;
 
 			trips {
@@ -8987,7 +9026,7 @@
 			};
 		};
 
-		cpu-2-5-1-thermal {
+		thermal_cpu_2_5_1: cpu-2-5-1-thermal {
 			thermal-sensors = <&tsens4 12>;
 
 			trips {
@@ -9011,7 +9050,7 @@
 			};
 		};
 
-		cpullc-2-0-thermal {
+		thermal_cpullc_2_0: cpullc-2-0-thermal {
 			thermal-sensors = <&tsens5 1>;
 
 			trips {
@@ -9023,7 +9062,7 @@
 			};
 		};
 
-		cpuillc-2-1-thermal {
+		thermal_cpuillc_2_1: cpuillc-2-1-thermal {
 			thermal-sensors = <&tsens5 2>;
 
 			trips {
@@ -9035,7 +9074,7 @@
 			};
 		};
 
-		qmx-2-0-thermal {
+		thermal_qmx_2_0: qmx-2-0-thermal {
 			thermal-sensors = <&tsens5 3>;
 
 			trips {
@@ -9047,7 +9086,7 @@
 			};
 		};
 
-		qmx-2-1-thermal {
+		thermal_qmx_2_1: qmx-2-1-thermal {
 			thermal-sensors = <&tsens5 4>;
 
 			trips {
@@ -9059,7 +9098,7 @@
 			};
 		};
 
-		qmx-2-2-thermal {
+		thermal_qmx_2_2: qmx-2-2-thermal {
 			thermal-sensors = <&tsens5 5>;
 
 			trips {
@@ -9071,7 +9110,7 @@
 			};
 		};
 
-		qmx-2-3-thermal {
+		thermal_qmx_2_3: qmx-2-3-thermal {
 			thermal-sensors = <&tsens5 6>;
 
 			trips {
@@ -9083,7 +9122,7 @@
 			};
 		};
 
-		qmx-2-4-thermal {
+		thermal_qmx_2_4: qmx-2-4-thermal {
 			thermal-sensors = <&tsens5 7>;
 
 			trips {
@@ -9095,7 +9134,7 @@
 			};
 		};
 
-		aoss-6-thermal {
+		thermal_aoss_6: aoss-6-thermal {
 			thermal-sensors = <&tsens6 0>;
 
 			trips {
@@ -9107,7 +9146,7 @@
 			};
 		};
 
-		nsphvx-0-thermal {
+		thermal_nsphvx_0: nsphvx-0-thermal {
 			thermal-sensors = <&tsens6 1>;
 
 			trips {
@@ -9119,7 +9158,7 @@
 			};
 		};
 
-		nsphvx-1-thermal {
+		thermal_nsphvx_1: nsphvx-1-thermal {
 			thermal-sensors = <&tsens6 2>;
 
 			trips {
@@ -9131,7 +9170,7 @@
 			};
 		};
 
-		nsphvx-2-thermal {
+		thermal_nsphvx_2: nsphvx-2-thermal {
 			thermal-sensors = <&tsens6 3>;
 
 			trips {
@@ -9143,7 +9182,7 @@
 			};
 		};
 
-		nsphvx-3-thermal {
+		thermal_nsphvx_3: nsphvx-3-thermal {
 			thermal-sensors = <&tsens6 4>;
 
 			trips {
@@ -9155,7 +9194,7 @@
 			};
 		};
 
-		nsphmx-0-thermal {
+		thermal_nsphmx_0: nsphmx-0-thermal {
 			thermal-sensors = <&tsens6 5>;
 
 			trips {
@@ -9167,7 +9206,7 @@
 			};
 		};
 
-		nsphmx-1-thermal {
+		thermal_nsphmx_1: nsphmx-1-thermal {
 			thermal-sensors = <&tsens6 6>;
 
 			trips {
@@ -9179,7 +9218,7 @@
 			};
 		};
 
-		nsphmx-2-thermal {
+		thermal_nsphmx_2: nsphmx-2-thermal {
 			thermal-sensors = <&tsens6 7>;
 
 			trips {
@@ -9191,7 +9230,7 @@
 			};
 		};
 
-		nsphmx-3-thermal {
+		thermal_nsphmx_3: nsphmx-3-thermal {
 			thermal-sensors = <&tsens6 8>;
 
 			trips {
@@ -9203,7 +9242,7 @@
 			};
 		};
 
-		camera-0-thermal {
+		thermal_camera_0: camera-0-thermal {
 			thermal-sensors = <&tsens6 9>;
 
 			trips {
@@ -9215,7 +9254,7 @@
 			};
 		};
 
-		camera-1-thermal {
+		thermal_camera_1: camera-1-thermal {
 			thermal-sensors = <&tsens6 10>;
 
 			trips {
@@ -9227,7 +9266,7 @@
 			};
 		};
 
-		ddr-1-thermal {
+		thermal_ddr_1: ddr-1-thermal {
 			thermal-sensors = <&tsens6 11>;
 
 			trips {
@@ -9239,7 +9278,7 @@
 			};
 		};
 
-		ddr-2-thermal {
+		thermal_ddr_2: ddr-2-thermal {
 			thermal-sensors = <&tsens6 12>;
 
 			trips {
@@ -9251,7 +9290,7 @@
 			};
 		};
 
-		aoss-7-thermal {
+		thermal_aoss_7: aoss-7-thermal {
 			thermal-sensors = <&tsens7 0>;
 
 			trips {
@@ -9263,7 +9302,7 @@
 			};
 		};
 
-		gpu-0-0-thermal {
+		thermal_gpu_0_0: gpu-0-0-thermal {
 			thermal-sensors = <&tsens7 1>;
 
 			trips {
@@ -9281,7 +9320,7 @@
 			};
 		};
 
-		gpu-0-1-thermal {
+		thermal_gpu_0_1: gpu-0-1-thermal {
 			thermal-sensors = <&tsens7 2>;
 
 			trips {
@@ -9299,7 +9338,7 @@
 			};
 		};
 
-		gpu-0-2-thermal {
+		thermal_gpu_0_2: gpu-0-2-thermal {
 			thermal-sensors = <&tsens7 3>;
 
 			trips {
@@ -9317,7 +9356,7 @@
 			};
 		};
 
-		gpu-1-0-thermal {
+		thermal_gpu_1_0: gpu-1-0-thermal {
 			thermal-sensors = <&tsens7 4>;
 
 			trips {
@@ -9335,7 +9374,7 @@
 			};
 		};
 
-		gpu-1-1-thermal {
+		thermal_gpu_1_1: gpu-1-1-thermal {
 			thermal-sensors = <&tsens7 5>;
 
 			trips {
@@ -9353,7 +9392,7 @@
 			};
 		};
 
-		gpu-1-2-thermal {
+		thermal_gpu_1_2: gpu-1-2-thermal {
 			thermal-sensors = <&tsens7 6>;
 
 			trips {
@@ -9371,7 +9410,7 @@
 			};
 		};
 
-		gpu-2-0-thermal {
+		thermal_gpu_2_0: gpu-2-0-thermal {
 			thermal-sensors = <&tsens7 7>;
 
 			trips {
@@ -9389,7 +9428,7 @@
 			};
 		};
 
-		gpu-2-1-thermal {
+		thermal_gpu_2_1: gpu-2-1-thermal {
 			thermal-sensors = <&tsens7 8>;
 
 			trips {
@@ -9407,7 +9446,7 @@
 			};
 		};
 
-		gpu-2-2-thermal {
+		thermal_gpu_2_2: gpu-2-2-thermal {
 			thermal-sensors = <&tsens7 9>;
 
 			trips {
@@ -9425,7 +9464,7 @@
 			};
 		};
 
-		gpu-3-0-thermal {
+		thermal_gpu_3_0: gpu-3-0-thermal {
 			thermal-sensors = <&tsens7 10>;
 
 			trips {
@@ -9443,7 +9482,7 @@
 			};
 		};
 
-		gpu-3-1-thermal {
+		thermal_gpu_3_1: gpu-3-1-thermal {
 			thermal-sensors = <&tsens7 11>;
 
 			trips {
@@ -9461,7 +9500,7 @@
 			};
 		};
 
-		gpu-3-2-thermal {
+		thermal_gpu_3_2: gpu-3-2-thermal {
 			thermal-sensors = <&tsens7 12>;
 
 			trips {
@@ -9479,7 +9518,7 @@
 			};
 		};
 
-		gpuss-0-thermal {
+		thermal_gpuss_0: gpuss-0-thermal {
 			thermal-sensors = <&tsens7 13>;
 
 			trips {
@@ -9497,7 +9536,7 @@
 			};
 		};
 
-		gpuss-1-thermal {
+		thermal_gpuss_1: gpuss-1-thermal {
 			thermal-sensors = <&tsens7 14>;
 
 			trips {
