@@ -84,22 +84,9 @@ static void msm_dp_mst_destroy_bridge_state(struct drm_private_obj *obj,
 	kfree(mst_bridge_state);
 }
 
-static struct drm_private_state *
-msm_dp_mst_create_bridge_state(struct drm_private_obj *obj)
-{
-	struct msm_dp_mst_bridge_state *mst_bridge_state;
 
-	mst_bridge_state = kzalloc_obj(*mst_bridge_state);
-	if (!mst_bridge_state)
-		return ERR_PTR(-ENOMEM);
-
-	__drm_atomic_helper_private_obj_create_state(obj, &mst_bridge_state->base);
-
-	return &mst_bridge_state->base;
-}
 
 static const struct drm_private_state_funcs msm_dp_mst_bridge_state_funcs = {
-	.atomic_create_state    = msm_dp_mst_create_bridge_state,
 	.atomic_duplicate_state = msm_dp_mst_duplicate_bridge_state,
 	.atomic_destroy_state   = msm_dp_mst_destroy_bridge_state,
 };
@@ -471,8 +458,18 @@ int msm_dp_mst_attach_encoder(struct msm_dp *dp_display, struct drm_encoder *enc
 		goto end;
 	}
 
-	drm_atomic_private_obj_init(dev, &bridge->obj,
-				    &msm_dp_mst_bridge_state_funcs);
+	{
+		struct msm_dp_mst_bridge_state *init_state;
+
+		init_state = kzalloc(sizeof(*init_state), GFP_KERNEL);
+		if (!init_state) {
+			rc = -ENOMEM;
+			goto end;
+		}
+		drm_atomic_private_obj_init(dev, &bridge->obj,
+					    &init_state->base,
+					    &msm_dp_mst_bridge_state_funcs);
+	}
 
 	drm_dbg_dp(dp_display->drm_dev, "MST drm bridge init. bridge id:%d\n", i);
 
