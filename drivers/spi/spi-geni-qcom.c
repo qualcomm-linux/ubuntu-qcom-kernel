@@ -604,7 +604,11 @@ static int spi_geni_init(struct spi_geni_master *mas)
 	u32 spi_tx_cfg, fifo_disable;
 	int ret = -ENXIO;
 
-	pm_runtime_get_sync(mas->dev);
+	ret = pm_runtime_get_sync(mas->dev);
+	if (ret < 0) {
+		pm_runtime_put_noidle(mas->dev);
+		return ret;
+	}
 
 	proto = geni_se_read_proto(se);
 

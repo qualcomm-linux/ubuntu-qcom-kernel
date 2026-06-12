@@ -647,6 +647,18 @@ int geni_se_resources_on(struct geni_se *se)
 	if (ret)
 		return ret;
 
+	/*
+	 * Enable hardware-controlled AHB master clock gating on the wrapper.
+	 * On platforms using Linux-side SE firmware loading (firmware-name DT
+	 * property), TZ may not initialize this register, leaving the AHB
+	 * master path to SE registers disabled. Setting this bit here ensures
+	 * SE registers are accessible after clocks are enabled, regardless of
+	 * whether TZ or Linux loaded the firmware.
+	 */
+	if (se->wrapper)
+		geni_setbits32(se->wrapper->base + QUPV3_SE_AHB_M_CFG,
+			       AHB_M_CLK_CGC_ON);
+
 	ret = pinctrl_pm_select_default_state(se->dev);
 	if (ret)
 		geni_se_clks_off(se);
