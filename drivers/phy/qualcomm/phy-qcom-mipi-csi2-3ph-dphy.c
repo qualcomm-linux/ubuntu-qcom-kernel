@@ -335,8 +335,6 @@ static const struct mipi_csi2phy_hw_ops phy_qcom_mipi_csi2_ops_3ph_1_0 = {
 	.lanes_disable = phy_qcom_mipi_csi2_lanes_disable,
 };
 
-static const struct mipi_csi2phy_clk_freq zero = { 0 };
-
 static const struct mipi_csi2phy_clk_freq dphy_4nm_x1e_csiphy = {
 	.freq = {
 		300000000, 400000000, 480000000
@@ -352,10 +350,8 @@ static const struct mipi_csi2phy_clk_freq dphy_4nm_x1e_csiphy_timer = {
 };
 
 static const char * const x1e_clks[] = {
-	"camnoc_axi",
-	"cpas_ahb",
-	"csiphy",
-	"csiphy_timer"
+	"core",
+	"timer"
 };
 
 const struct mipi_csi2phy_soc_cfg mipi_csi2_dphy_4nm_x1e = {
@@ -373,11 +369,9 @@ const struct mipi_csi2phy_soc_cfg mipi_csi2_dphy_4nm_x1e = {
 	.num_supplies = 2,
 	.clk_names = (const char **)x1e_clks,
 	.num_clk = ARRAY_SIZE(x1e_clks),
-	.opp_clk = x1e_clks[2],
-	.timer_clk = x1e_clks[3],
+	.opp_clk = x1e_clks[0],
+	.timer_clk = x1e_clks[1],
 	.clk_freq = {
-		zero,
-		zero,
 		dphy_4nm_x1e_csiphy,
 		dphy_4nm_x1e_csiphy_timer,
 	},
