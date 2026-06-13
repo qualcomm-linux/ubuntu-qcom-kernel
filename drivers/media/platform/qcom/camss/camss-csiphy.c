@@ -7,7 +7,6 @@
  * Copyright (c) 2011-2015, The Linux Foundation. All rights reserved.
  * Copyright (C) 2016-2018 Linaro Ltd.
  */
-#include <dt-bindings/phy/phy.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
@@ -796,7 +795,6 @@ int msm_csiphy_subdev_init(struct camss *camss,
 {
 	struct device *dev = camss->dev;
 	struct of_phandle_args args;
-	u8 combo_mode;
 	int idx;
 	int ret;
 
@@ -817,13 +815,6 @@ int msm_csiphy_subdev_init(struct camss *camss,
 	if (!of_device_is_available(args.np))
 		goto put_np;
 
-	combo_mode = args.args[0];
-	if (combo_mode != PHY_TYPE_DPHY) {
-		dev_err(dev, "%s mode %d not supported\n", csiphy->name, combo_mode);
-		ret = -EOPNOTSUPP;
-		goto put_np;
-	}
-
 	csiphy->phy = devm_phy_get(dev, csiphy->name);
 	if (IS_ERR(csiphy->phy)) {
 		ret = PTR_ERR(csiphy->phy);
@@ -832,7 +823,6 @@ int msm_csiphy_subdev_init(struct camss *camss,
 
 	csiphy->camss = camss;
 	csiphy->id = id;
-	csiphy->cfg.combo_mode = combo_mode;
 	csiphy->res = &res->csiphy;
 
 	ret = phy_init(csiphy->phy);
