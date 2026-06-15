@@ -759,7 +759,6 @@ CONFIG_DRM_NOUVEAU_CH7006                       policy<{'arm64': '-'}>
 CONFIG_DRM_NOUVEAU_GSP_DEFAULT                  policy<{'arm64': '-'}>
 CONFIG_DRM_NOUVEAU_SIL164                       policy<{'arm64': '-'}>
 CONFIG_DRM_NOUVEAU_SVM                          policy<{'arm64': '-'}>
-CONFIG_DRM_NOVA                                 policy<{'arm64': 'n'}>
 CONFIG_DRM_PANEL_BACKLIGHT_QUIRKS               policy<{'arm64': '-'}>
 CONFIG_DRM_PANEL_DLC0697                        policy<{'arm64': 'y'}>
 CONFIG_DRM_PL111                                policy<{'arm64': 'n'}>
@@ -1977,7 +1976,6 @@ CONFIG_RTC_DRV_XGENE                            policy<{'arm64': '-'}>
 CONFIG_RTD119X_WATCHDOG                         policy<{'arm64': '-'}>
 CONFIG_RTK_SYSTIMER                             policy<{'arm64': '-'}>
 CONFIG_RTSN                                     policy<{'arm64': '-'}>
-CONFIG_RUSTC_VERSION_TEXT                       policy<{'arm64': '"rustc 1.93.1 (01f6ddf75 2026-02-11)"'}>
 CONFIG_RZG2L_ADC                                policy<{'arm64': '-'}>
 CONFIG_RZG2L_THERMAL                            policy<{'arm64': '-'}>
 CONFIG_RZG3E_THERMAL                            policy<{'arm64': '-'}>
