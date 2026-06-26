@@ -1345,22 +1345,6 @@
 	};
 };
 
-&gpuss0_alert0 {
-	temperature = <105000>;
-};
-
-&gpuss1_alert0 {
-	temperature = <105000>;
-};
-
-&gpuss2_alert0 {
-	temperature = <105000>;
-};
-
-&gpuss3_alert0 {
-	temperature = <105000>;
-};
-
 &tlmm {
 	edp_reg_en: edp-reg-en-state {
 		pins = "gpio70";
