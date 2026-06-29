@@ -18,6 +18,15 @@ CONFIG_ARCH_ROCKCHIP                            note<'LP: #1825222'>
 CONFIG_ARM_SMMU_DISABLE_BYPASS_BY_DEFAULT       policy<{'arm64': 'y'}>
 CONFIG_ARM_SMMU_DISABLE_BYPASS_BY_DEFAULT       note<'LP: #2102032'>
 
+CONFIG_CLK_X1E80100_CAMCC                       policy<{'arm64': 'y'}>
+CONFIG_CLK_X1E80100_CAMCC                       note<'builtin: apps_smmu camera TBU GDSC must register before built-in clients probe to avoid TLB-sync deadlock'>
+
+CONFIG_CLK_X1E80100_DISPCC                      policy<{'arm64': 'y'}>
+CONFIG_CLK_X1E80100_DISPCC                      note<'builtin: apps_smmu display TBU GDSC must register before built-in clients probe to avoid TLB-sync deadlock'>
+
+CONFIG_CLK_X1E80100_GPUCC                       policy<{'arm64': 'y'}>
+CONFIG_CLK_X1E80100_GPUCC                       note<'builtin: GPU TBU GDSC must register before built-in clients probe to avoid TLB-sync deadlock'>
+
 CONFIG_DRM_AMDGPU_CIK                           policy<{'arm64': '-'}>
 CONFIG_DRM_AMDGPU_CIK                           note<'for zesty'>
 
@@ -89,6 +98,9 @@ CONFIG_SERIAL_SH_SCI_CONSOLE                    note<'LP: #2022361'>
 
 CONFIG_SERIAL_SH_SCI_EARLYCON                   policy<{'arm64': '-'}>
 CONFIG_SERIAL_SH_SCI_EARLYCON                   note<'LP: #2022361'>
+
+CONFIG_SM_VIDEOCC_8550                          policy<{'arm64': 'y'}>
+CONFIG_SM_VIDEOCC_8550                          note<'builtin: x1e80100 video TBU GDSC must register before built-in clients probe to avoid TLB-sync deadlock'>
 
 CONFIG_SND                                      policy<{'arm64': 'y'}>
 CONFIG_SND                                      note<'LP: #2126816'>
@@ -1976,6 +1988,7 @@ CONFIG_RTC_DRV_XGENE                            policy<{'arm64': '-'}>
 CONFIG_RTD119X_WATCHDOG                         policy<{'arm64': '-'}>
 CONFIG_RTK_SYSTIMER                             policy<{'arm64': '-'}>
 CONFIG_RTSN                                     policy<{'arm64': '-'}>
+CONFIG_RUSTC_VERSION_TEXT                       policy<{'arm64': '"rustc 1.93.1 (01f6ddf75 2026-02-11)"'}>
 CONFIG_RZG2L_ADC                                policy<{'arm64': '-'}>
 CONFIG_RZG2L_THERMAL                            policy<{'arm64': '-'}>
 CONFIG_RZG3E_THERMAL                            policy<{'arm64': '-'}>
