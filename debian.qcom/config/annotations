@@ -2002,7 +2002,7 @@ CONFIG_SAMPLE_CORESIGHT_SYSCFG                  policy<{'arm64': 'n'}>
 CONFIG_SATA_AHCI_SEATTLE                        policy<{'arm64': '-'}>
 CONFIG_SATA_RCAR                                policy<{'arm64': '-'}>
 CONFIG_SC27XX_ADC                               policy<{'arm64': '-'}>
-CONFIG_SCMI_QCOM_MEMLAT_DEVFREQ                 policy<{'arm64': 'y'}>
+CONFIG_SCMI_QCOM_MEMLAT_DEVFREQ                 policy<{'arm64': 'm'}>
 CONFIG_SCSI_UFS_AMD_VERSAL2                     policy<{'arm64': '-'}>
 CONFIG_SCSI_UFS_HISI                            policy<{'arm64': '-'}>
 CONFIG_SCSI_UFS_MEDIATEK                        policy<{'arm64': '-'}>
