@@ -18,20 +18,17 @@ CONFIG_ARCH_ROCKCHIP                            note<'LP: #1825222'>
 CONFIG_ARM_SMMU_DISABLE_BYPASS_BY_DEFAULT       policy<{'arm64': 'y'}>
 CONFIG_ARM_SMMU_DISABLE_BYPASS_BY_DEFAULT       note<'LP: #2102032'>
 
-CONFIG_CLK_X1E80100_CAMCC                       policy<{'arm64': 'y'}>
-CONFIG_CLK_X1E80100_CAMCC                       note<'builtin: apps_smmu camera TBU GDSC must register before built-in clients probe to avoid TLB-sync deadlock'>
-
-CONFIG_CLK_X1E80100_DISPCC                      policy<{'arm64': 'y'}>
-CONFIG_CLK_X1E80100_DISPCC                      note<'builtin: apps_smmu display TBU GDSC must register before built-in clients probe to avoid TLB-sync deadlock'>
-
-CONFIG_CLK_X1E80100_GPUCC                       policy<{'arm64': 'y'}>
-CONFIG_CLK_X1E80100_GPUCC                       note<'builtin: GPU TBU GDSC must register before built-in clients probe to avoid TLB-sync deadlock'>
+CONFIG_CHR_DEV_SG                               policy<{'arm64': 'y', 'arm64-qcom': 'm'}>
+CONFIG_CHR_DEV_SG                               note<'TODO: update note'>
 
 CONFIG_DRM_AMDGPU_CIK                           policy<{'arm64': '-'}>
 CONFIG_DRM_AMDGPU_CIK                           note<'for zesty'>
 
 CONFIG_DRM_MGAG200                              policy<{'arm64': 'n'}>
 CONFIG_DRM_MGAG200                              note<'LP: #1693337'>
+
+CONFIG_DRM_NOVA                                 policy<{'arm64': 'n', 'arm64-qcom': '-'}>
+CONFIG_DRM_NOVA                                 note<TODO: update note>
 
 CONFIG_EFI_ZBOOT                                policy<{'arm64': 'n'}>
 CONFIG_EFI_ZBOOT                                note<'we use arch/arm64/boot/Image.gz'>
@@ -90,6 +87,9 @@ CONFIG_RCU_NOCB_CPU_DEFAULT_ALL                 note<'TODO: update note'>
 CONFIG_REGULATOR_FIXED_VOLTAGE                  policy<{'arm64': 'y'}>
 CONFIG_REGULATOR_FIXED_VOLTAGE                  note<'boot essential on arm'>
 
+CONFIG_RUST                                     policy<{'arm64': 'y', 'arm64-qcom': '-'}>
+CONFIG_RUST                                     note<TODO: update note>
+
 CONFIG_SERIAL_SH_SCI                            policy<{'arm64': '-'}>
 CONFIG_SERIAL_SH_SCI                            note<'LP: #2022361'>
 
@@ -123,8 +123,10 @@ CONFIG_TOUCHSCREEN_APPLE_Z2                     note<'TODO: update note'>
 
 # ---- Annotations without notes ----
 
+CONFIG_842_COMPRESS                             policy<{'arm64': 'm', 'arm64-qcom': 'y'}>
+CONFIG_842_DECOMPRESS                           policy<{'arm64': 'm', 'arm64-qcom': 'y'}>
 CONFIG_AC97_BUS                                 policy<{'arm64': 'y'}>
-CONFIG_ACPI_AEST                                policy<{'arm64': 'n'}>
+CONFIG_ACPI_AEST                                policy<{'arm64-qcom': 'n'}>
 CONFIG_ADI_AXI_ADC                              policy<{'arm64': '-'}>
 CONFIG_ADI_AXI_DAC                              policy<{'arm64': '-'}>
 CONFIG_AEST                                     policy<{'arm64': 'y'}>
@@ -138,8 +140,10 @@ CONFIG_AHCI_XGENE                               policy<{'arm64': '-'}>
 CONFIG_AIROHA_CPU_PM_DOMAIN                     policy<{'arm64': '-'}>
 CONFIG_AIROHA_THERMAL                           policy<{'arm64': '-'}>
 CONFIG_AIROHA_WATCHDOG                          policy<{'arm64': '-'}>
+CONFIG_AMCC_QT2025_PHY                          policy<{'arm64': 'm', 'arm64-qcom': '-'}>
 CONFIG_AMD_ISP4                                 policy<{'arm64': '-'}>
 CONFIG_AMLOGIC_THERMAL                          policy<{'arm64': '-'}>
+CONFIG_ANDROID_BINDER_IPC_RUST                  policy<{'arm64': 'n', 'arm64-qcom': '-'}>
 CONFIG_APPLE_ADMAC                              policy<{'arm64': '-'}>
 CONFIG_APPLE_AIC                                policy<{'arm64': '-'}>
 CONFIG_APPLE_DART                               policy<{'arm64': '-'}>
@@ -278,6 +282,7 @@ CONFIG_ARM_TEGRA194_CPUFREQ                     policy<{'arm64': '-'}>
 CONFIG_ARM_TEGRA20_CPUFREQ                      policy<{'arm64': '-'}>
 CONFIG_ARM_TEGRA_DEVFREQ                        policy<{'arm64': '-'}>
 CONFIG_ARM_TI_CPUFREQ                           policy<{'arm64': '-'}>
+CONFIG_AS_VERSION                               policy<{'arm64': '24600', 'arm64-qcom': '24200'}>
 CONFIG_ATH10K_DFS_CERTIFIED                     policy<{'arm64': 'n'}>
 CONFIG_ATH11K_COREDUMP                          policy<{'arm64': '-'}>
 CONFIG_ATH5K_TEST_CHANNELS                      policy<{'arm64': 'n'}>
@@ -287,6 +292,7 @@ CONFIG_ATH9K_TX99                               policy<{'arm64': 'n'}>
 CONFIG_ATH_REG_DYNAMIC_USER_CERT_TESTING        policy<{'arm64': 'n'}>
 CONFIG_ATH_REG_DYNAMIC_USER_REG_HINTS           policy<{'arm64': 'y'}>
 CONFIG_AX88179B                                 policy<{'arm64': '-'}>
+CONFIG_AX88796B_RUST_PHY                        policy<{'arm64': 'n', 'arm64-qcom': '-'}>
 CONFIG_AXI_DMAC                                 policy<{'arm64': '-'}>
 CONFIG_BACKLIGHT_APPLE_DWI                      policy<{'arm64': '-'}>
 CONFIG_BACKLIGHT_QCOM_WLED                      policy<{'arm64': 'y'}>
@@ -300,7 +306,9 @@ CONFIG_BCMDHD_SDIO                              policy<{'arm64': '-'}>
 CONFIG_BCMDHD_SDIO_IRQ                          policy<{'arm64': '-'}>
 CONFIG_BCMDHD_USB                               policy<{'arm64': '-'}>
 CONFIG_BERLIN2_ADC                              policy<{'arm64': '-'}>
+CONFIG_BINDGEN_VERSION_TEXT                     policy<{'arm64': '"bindgen 0.72.1"', 'arm64-qcom': '-'}>
 CONFIG_BLK_CGROUP_IOLATENCY                     policy<{'arm64': 'n', 'arm64-qcom-rt': 'y'}>
+CONFIG_BLK_DEV_RUST_NULL                        policy<{'arm64': 'n', 'arm64-qcom': '-'}>
 CONFIG_BRIDGE_EBT_BROUTE                        policy<{'arm64': 'm', 'arm64-qcom-rt': '-'}>
 CONFIG_BRIDGE_EBT_T_FILTER                      policy<{'arm64': 'm', 'arm64-qcom-rt': '-'}>
 CONFIG_BRIDGE_EBT_T_NAT                         policy<{'arm64': 'm', 'arm64-qcom-rt': '-'}>
@@ -310,6 +318,11 @@ CONFIG_CAN_RCAR                                 policy<{'arm64': '-'}>
 CONFIG_CAN_RCAR_CANFD                           policy<{'arm64': '-'}>
 CONFIG_CAN_ROCKCHIP_CANFD                       policy<{'arm64': '-'}>
 CONFIG_CAVIUM_CPT                               policy<{'arm64': '-'}>
+CONFIG_CC_HAS_COUNTED_BY                        policy<{'arm64': 'y', 'arm64-qcom': '-'}>
+CONFIG_CC_HAS_MIN_FUNCTION_ALIGNMENT            policy<{'arm64': 'y', 'arm64-qcom': '-'}>
+CONFIG_CC_HAS_MULTIDIMENSIONAL_NONSTRING        policy<{'arm64': 'y', 'arm64-qcom': '-'}>
+CONFIG_CC_HAS_SANE_FUNCTION_ALIGNMENT           policy<{'arm64': 'y', 'arm64-qcom': '-'}>
+CONFIG_CC_VERSION_TEXT                          policy<{'arm64': '"aarch64-linux-gnu-gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0"', 'arm64-qcom': '"aarch64-linux-gnu-gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0"'}>
 CONFIG_CEC_GPIO                                 policy<{'arm64': 'm', 'arm64-qcom-rt': 'n'}>
 CONFIG_CEC_MESON_AO                             policy<{'arm64': '-'}>
 CONFIG_CEC_MESON_G12A_AO                        policy<{'arm64': '-'}>
@@ -331,7 +344,7 @@ CONFIG_CLK_ELIZA_DISPCC                         policy<{'arm64-qcom': 'y', 'arm6
 CONFIG_CLK_ELIZA_GCC                            policy<{'arm64-qcom': 'y', 'arm64-qcom-rt': 'm'}>
 CONFIG_CLK_ELIZA_TCSRCC                         policy<{'arm64-qcom': 'y', 'arm64-qcom-rt': 'm'}>
 CONFIG_CLK_GLYMUR_CAMCC                         policy<{'arm64-qcom': 'y', 'arm64-qcom-rt': 'm'}>
-CONFIG_CLK_GLYMUR_EVACC                         policy<{'arm64': 'm'}>
+CONFIG_CLK_GLYMUR_EVACC                         policy<{'arm64-qcom': 'm'}>
 CONFIG_CLK_GLYMUR_GCC                           policy<{'arm64': 'y'}>
 CONFIG_CLK_GLYMUR_GPUCC                         policy<{'arm64': 'y'}>
 CONFIG_CLK_GLYMUR_VIDEOCC                       policy<{'arm64': 'y'}>
@@ -400,7 +413,7 @@ CONFIG_CLK_RK3588                               policy<{'arm64': '-'}>
 CONFIG_CLK_RV1126B                              policy<{'arm64': '-'}>
 CONFIG_CLK_RZG2L                                policy<{'arm64': '-'}>
 CONFIG_CLK_RZV2H                                policy<{'arm64': '-'}>
-CONFIG_CLK_SHIKRA_AUDIOCORECC                   policy<{'arm64': 'y'}>
+CONFIG_CLK_SHIKRA_AUDIOCORECC                   policy<{'arm64-qcom': 'm'}>
 CONFIG_CLK_SHIKRA_DISPCC                        policy<{'arm64': 'm'}>
 CONFIG_CLK_SHIKRA_GCC                           policy<{'arm64': 'y'}>
 CONFIG_CLK_SHIKRA_GPUCC                         policy<{'arm64': 'm'}>
@@ -618,6 +631,7 @@ CONFIG_COMMON_RESET_HI6220                      policy<{'arm64': '-'}>
 CONFIG_COMPACT_UNEVICTABLE_DEFAULT              policy<{'arm64': '1', 'arm64-qcom-rt': '0'}>
 CONFIG_CORESIGHT                                policy<{'arm64': 'm'}>
 CONFIG_CORESIGHT_CPU_DEBUG                      policy<{'arm64': 'n'}>
+CONFIG_CORESIGHT_CTCU                           policy<{'arm64-qcom': '-'}>
 CONFIG_CORESIGHT_CTI                            policy<{'arm64': 'n'}>
 CONFIG_CORESIGHT_DUMMY                          policy<{'arm64': 'm'}>
 CONFIG_CORESIGHT_LINKS_AND_SINKS                policy<{'arm64': 'm'}>
@@ -630,6 +644,7 @@ CONFIG_CORESIGHT_TNOC                           policy<{'arm64': 'm'}>
 CONFIG_CORESIGHT_TPDA                           policy<{'arm64': 'm'}>
 CONFIG_CORESIGHT_TPDM                           policy<{'arm64': 'm'}>
 CONFIG_CORESIGHT_TRBE                           policy<{'arm64': 'n'}>
+CONFIG_CPUFREQ_DT_RUST                          policy<{'arm64': 'm', 'arm64-qcom': '-'}>
 CONFIG_CPUMASK_OFFSTACK                         policy<{'arm64': '-'}>
 CONFIG_CRC7                                     policy<{'arm64': 'y'}>
 CONFIG_CRC_ITU_T                                policy<{'arm64': 'y'}>
@@ -758,7 +773,7 @@ CONFIG_DRM_INNO_HDMI                            policy<{'arm64': '-'}>
 CONFIG_DRM_KMB_DISPLAY                          policy<{'arm64': '-'}>
 CONFIG_DRM_LOGICVC                              policy<{'arm64': 'n'}>
 CONFIG_DRM_LONTIUM_LT8713SX                     policy<{'arm64': 'm'}>
-CONFIG_DRM_LONTIUM_LT9611C                      policy<{'arm64': 'm'}>
+CONFIG_DRM_LONTIUM_LT9611C                      policy<{'arm64-qcom': 'n'}>
 CONFIG_DRM_MEDIATEK                             policy<{'arm64': '-'}>
 CONFIG_DRM_MEDIATEK_DP                          policy<{'arm64': '-'}>
 CONFIG_DRM_MEDIATEK_HDMI                        policy<{'arm64': '-'}>
@@ -767,7 +782,7 @@ CONFIG_DRM_MEDIATEK_HDMI_V2                     policy<{'arm64': '-'}>
 CONFIG_DRM_MESON                                policy<{'arm64': '-'}>
 CONFIG_DRM_MESON_DW_HDMI                        policy<{'arm64': '-'}>
 CONFIG_DRM_MESON_DW_MIPI_DSI                    policy<{'arm64': '-'}>
-CONFIG_DRM_MSM_VALIDATE_XML                     policy<{'arm64': '-'}>
+CONFIG_DRM_MSM_VALIDATE_XML                     policy<{'arm64': '-', 'arm64-qcom': 'n'}>
 CONFIG_DRM_MXS                                  policy<{'arm64': '-'}>
 CONFIG_DRM_MXSFB                                policy<{'arm64': '-'}>
 CONFIG_DRM_NOUVEAU                              policy<{'arm64': 'n'}>
@@ -778,6 +793,7 @@ CONFIG_DRM_NOUVEAU_SIL164                       policy<{'arm64': '-'}>
 CONFIG_DRM_NOUVEAU_SVM                          policy<{'arm64': '-'}>
 CONFIG_DRM_PANEL_BACKLIGHT_QUIRKS               policy<{'arm64': '-'}>
 CONFIG_DRM_PANEL_DLC0697                        policy<{'arm64': 'y'}>
+CONFIG_DRM_PANIC_SCREEN_QR_CODE                 policy<{'arm64': 'n', 'arm64-qcom': '-'}>
 CONFIG_DRM_PL111                                policy<{'arm64': 'n'}>
 CONFIG_DRM_RADEON                               policy<{'arm64': 'n'}>
 CONFIG_DRM_RADEON_USERPTR                       policy<{'arm64': '-'}>
@@ -813,6 +829,7 @@ CONFIG_DRM_TEGRA                                policy<{'arm64': '-'}>
 CONFIG_DRM_TEGRA_DEBUG                          policy<{'arm64': '-'}>
 CONFIG_DRM_TEGRA_STAGING                        policy<{'arm64': '-'}>
 CONFIG_DRM_TIDSS                                policy<{'arm64': 'n'}>
+CONFIG_DRM_TYR                                  policy<{'arm64': 'm', 'arm64-qcom': '-'}>
 CONFIG_DRM_XE                                   policy<{'arm64': 'n'}>
 CONFIG_DRM_XE_DEBUG                             policy<{'arm64': '-'}>
 CONFIG_DRM_XE_DEBUG_MEM                         policy<{'arm64': '-'}>
@@ -879,6 +896,7 @@ CONFIG_FB_PROVIDE_GET_FB_UNMAPPED_AREA          policy<{'arm64': '-'}>
 CONFIG_FB_SH_MOBILE_LCDC                        policy<{'arm64': '-'}>
 CONFIG_FB_XILINX                                policy<{'arm64': '-'}>
 CONFIG_FEC                                      policy<{'arm64': '-'}>
+CONFIG_FIND_BIT_BENCHMARK_RUST                  policy<{'arm64': 'n', 'arm64-qcom': '-'}>
 CONFIG_FPGA_MGR_SOCFPGA                         policy<{'arm64': '-'}>
 CONFIG_FPGA_MGR_SOCFPGA_A10                     policy<{'arm64': '-'}>
 CONFIG_FPGA_MGR_STRATIX10_SOC                   policy<{'arm64': '-'}>
@@ -908,6 +926,7 @@ CONFIG_FS_DAX_PMD                               policy<{'arm64': 'y', 'arm64-qco
 CONFIG_FUEL_GAUGE_SC27XX                        policy<{'arm64': '-'}>
 CONFIG_FW_DEVLINK_SYNC_STATE_TIMEOUT            policy<{'arm64': 'y'}>
 CONFIG_GCC_ASM_GOTO_OUTPUT_WORKAROUND           policy<{'arm64': '-'}>
+CONFIG_GCC_VERSION                              policy<{'arm64': '150200', 'arm64-qcom': '130300'}>
 CONFIG_GENERIC_IRQ_IPI_MUX                      policy<{'arm64': '-'}>
 CONFIG_GH_VIRT_WATCHDOG                         policy<{'arm64': '-'}>
 CONFIG_GPIO_ALTERA_A10SR                        policy<{'arm64': '-'}>
@@ -959,6 +978,7 @@ CONFIG_HAVE_KVM_IRQ_ROUTING                     policy<{'arm64': 'y', 'arm64-qco
 CONFIG_HAVE_KVM_MSI                             policy<{'arm64': 'y', 'arm64-qcom-rt': '-'}>
 CONFIG_HAVE_KVM_READONLY_MEM                    policy<{'arm64': 'y', 'arm64-qcom-rt': '-'}>
 CONFIG_HAVE_KVM_VCPU_RUN_PID_CHANGE             policy<{'arm64': 'y', 'arm64-qcom-rt': '-'}>
+CONFIG_HAVE_RUST                                policy<{'arm64': 'y', 'arm64-qcom': '-'}>
 CONFIG_HAVE_SCHED_AVG_IRQ                       policy<{'arm64-qcom-rt': 'y'}>
 CONFIG_HBMC_AM654                               policy<{'arm64': '-'}>
 CONFIG_HI3660_MBOX                              policy<{'arm64': '-'}>
@@ -1157,6 +1177,7 @@ CONFIG_KVM_MMIO                                 policy<{'arm64': 'y', 'arm64-qco
 CONFIG_KVM_VFIO                                 policy<{'arm64': 'y', 'arm64-qcom-rt': '-'}>
 CONFIG_LAN966X_OIC                              policy<{'arm64': '-'}>
 CONFIG_LAN969X_SWITCH                           policy<{'arm64': '-'}>
+CONFIG_LD_VERSION                               policy<{'arm64': '24600', 'arm64-qcom': '24200'}>
 CONFIG_LEDS_SC27XX_BLTC                         policy<{'arm64': '-'}>
 CONFIG_LEDS_SUN50I_A100                         policy<{'arm64': '-'}>
 CONFIG_LEDS_TRIGGER_CPU                         policy<{'arm64': 'y', 'arm64-qcom-rt': '-'}>
@@ -1165,6 +1186,8 @@ CONFIG_LOG_BUF_SHIFT                            policy<{'arm64': '17'}>
 CONFIG_LSM_MMAP_MIN_ADDR                        policy<{'arm64': '32768'}>
 CONFIG_LS_EXTIRQ                                policy<{'arm64': '-'}>
 CONFIG_LS_SCFG_MSI                              policy<{'arm64': '-'}>
+CONFIG_LZ4HC_COMPRESS                           policy<{'arm64': 'm', 'arm64-qcom': 'y'}>
+CONFIG_LZ4_COMPRESS                             policy<{'arm64': 'm', 'arm64-qcom': 'y'}>
 CONFIG_MACVLAN                                  policy<{'arm64': 'y'}>
 CONFIG_MACVTAP                                  policy<{'arm64': 'y'}>
 CONFIG_MARVELL_CN10K_DDR_PMU                    policy<{'arm64': '-'}>
@@ -1256,6 +1279,9 @@ CONFIG_MMC_TMIO_CORE                            policy<{'arm64': '-'}>
 CONFIG_MMP_PDMA                                 policy<{'arm64': '-'}>
 CONFIG_MMP_TDMA                                 policy<{'arm64': '-'}>
 CONFIG_MM_ID                                    policy<{'arm64': 'y', 'arm64-qcom-rt': '-'}>
+CONFIG_MODULE_SIG_KEY_TYPE_MLDSA_44             policy<{'arm64': 'n', 'arm64-qcom': '-'}>
+CONFIG_MODULE_SIG_KEY_TYPE_MLDSA_65             policy<{'arm64': 'n', 'arm64-qcom': '-'}>
+CONFIG_MODULE_SIG_KEY_TYPE_MLDSA_87             policy<{'arm64': 'n', 'arm64-qcom': '-'}>
 CONFIG_MSM_GCC_8916                             policy<{'arm64': 'y'}>
 CONFIG_MSM_GCC_8994                             policy<{'arm64': 'y'}>
 CONFIG_MSM_GCC_8998                             policy<{'arm64': 'y'}>
@@ -1350,6 +1376,7 @@ CONFIG_NOUVEAU_DEBUG_DEFAULT                    policy<{'arm64': '-'}>
 CONFIG_NOUVEAU_DEBUG_MMU                        policy<{'arm64': '-'}>
 CONFIG_NOUVEAU_DEBUG_PUSH                       policy<{'arm64': '-'}>
 CONFIG_NOUVEAU_PLATFORM_DRIVER                  policy<{'arm64': '-'}>
+CONFIG_NOVA_CORE                                policy<{'arm64': 'm', 'arm64-qcom': '-'}>
 CONFIG_NO_PAGE_MAPCOUNT                         policy<{'arm64': 'n', 'arm64-qcom-rt': '-'}>
 CONFIG_NPCM7XX_KCS_IPMI_BMC                     policy<{'arm64': '-'}>
 CONFIG_NPCM7XX_TIMER                            policy<{'arm64': '-'}>
@@ -1384,7 +1411,7 @@ CONFIG_NVMEM_ZYNQMP                             policy<{'arm64': '-'}>
 CONFIG_NVME_APPLE                               policy<{'arm64': '-'}>
 CONFIG_NXP_SAR_ADC                              policy<{'arm64': '-'}>
 CONFIG_NXP_STM_TIMER                            policy<{'arm64': '-'}>
-CONFIG_OF_AEST                                  policy<{'arm64': 'y'}>
+CONFIG_OF_AEST                                  policy<{'arm64-qcom': 'n'}>
 CONFIG_OLPC_EC                                  policy<{'arm64': '-'}>
 CONFIG_OLPC_XO175                               policy<{'arm64': '-'}>
 CONFIG_OLPC_XO175_EC                            policy<{'arm64': '-'}>
@@ -1394,12 +1421,14 @@ CONFIG_OMAP_GPMC                                policy<{'arm64': '-'}>
 CONFIG_OMAP_GPMC_DEBUG                          policy<{'arm64': '-'}>
 CONFIG_OMAP_MBOX_KFIFO_SIZE                     policy<{'arm64': '-'}>
 CONFIG_OMAP_USB2                                policy<{'arm64': '-'}>
+CONFIG_OPENSSL_SUPPORTS_ML_DSA                  policy<{'arm64': 'y', 'arm64-qcom': '-'}>
 CONFIG_OWL_DMA                                  policy<{'arm64': '-'}>
 CONFIG_OWL_EMAC                                 policy<{'arm64': '-'}>
 CONFIG_OWL_PM_DOMAINS                           policy<{'arm64': '-'}>
 CONFIG_OWL_PM_DOMAINS_HELPER                    policy<{'arm64': '-'}>
 CONFIG_OWL_TIMER                                policy<{'arm64': '-'}>
 CONFIG_PAGE_BLOCK_MAX_ORDER                     policy<{'arm64': '10'}>
+CONFIG_PAHOLE_VERSION                           policy<{'arm64': '131', 'arm64-qcom': '125'}>
 CONFIG_PANIC_TIMEOUT                            policy<{'arm64': '-1'}>
 CONFIG_PATA_IMX                                 policy<{'arm64': '-'}>
 CONFIG_PCIE_APPLE                               policy<{'arm64': '-'}>
@@ -1741,6 +1770,7 @@ CONFIG_PINCTRL_VISCONTI                         policy<{'arm64': '-'}>
 CONFIG_PINCTRL_X1E80100                         policy<{'arm64': 'y'}>
 CONFIG_PINCTRL_ZYNQMP                           policy<{'arm64': '-'}>
 CONFIG_PM_AUTOSLEEP                             policy<{'arm64': 'y'}>
+CONFIG_PM_WAKELOCKS_GC                          policy<{'arm64': 'y', 'arm64-qcom': 'n'}>
 CONFIG_PM_WAKELOCKS_LIMIT                       policy<{'arm64': '0'}>
 CONFIG_POWER_RESET_HISI                         policy<{'arm64': '-'}>
 CONFIG_POWER_RESET_LINKSTATION                  policy<{'arm64': '-'}>
@@ -1799,7 +1829,7 @@ CONFIG_QCOM_APR                                 policy<{'arm64': 'y'}>
 CONFIG_QCOM_BAM_DMA                             policy<{'arm64': 'y'}>
 CONFIG_QCOM_CLK_APCC_MSM8996                    policy<{'arm64': 'y'}>
 CONFIG_QCOM_CLK_APCS_MSM8916                    policy<{'arm64': 'y'}>
-CONFIG_QCOM_CLK_GP_MND                          policy<{'arm64': 'y'}>
+CONFIG_QCOM_CLK_GP_MND                          policy<{'arm64-qcom': 'n'}>
 CONFIG_QCOM_CLK_SMD_RPM                         policy<{'arm64': 'y'}>
 CONFIG_QCOM_CPR                                 policy<{'arm64': 'y'}>
 CONFIG_QCOM_CPUCP_MBOX                          policy<{'arm64': 'y'}>
@@ -1848,7 +1878,7 @@ CONFIG_QCOM_SMP2P                               policy<{'arm64': 'y'}>
 CONFIG_QCOM_SMP2P_SLEEPSTATE                    policy<{'arm64': '-'}>
 CONFIG_QCOM_SMSM                                policy<{'arm64': 'y'}>
 CONFIG_QCOM_SOC_DEBUG                           policy<{'arm64': '-'}>
-CONFIG_QCOM_SPEL                                policy<{'arm64': 'y'}>
+CONFIG_QCOM_SPEL                                policy<{'arm64-qcom': 'm'}>
 CONFIG_QCOM_SPMI_ADC5_GEN3                      policy<{'arm64': 'm'}>
 CONFIG_QCOM_SPMI_ADC_TM5_GEN3                   policy<{'arm64': 'm'}>
 CONFIG_QCOM_SPMI_MBG_TM                         policy<{'arm64': '-'}>
@@ -1900,6 +1930,7 @@ CONFIG_REGULATOR_STM32_BOOSTER                  policy<{'arm64': '-'}>
 CONFIG_REGULATOR_STM32_PWR                      policy<{'arm64': '-'}>
 CONFIG_REGULATOR_STM32_VREFBUF                  policy<{'arm64': '-'}>
 CONFIG_REGULATOR_SUN20I                         policy<{'arm64': '-'}>
+CONFIG_RELR                                     policy<{'arm64': 'n', 'arm64-qcom': '-'}>
 CONFIG_REMOTEPROC_THERMAL                       policy<{'arm64': 'y'}>
 CONFIG_RENESAS_DMA                              policy<{'arm64': '-'}>
 CONFIG_RENESAS_ETHER_SWITCH                     policy<{'arm64': '-'}>
@@ -1997,7 +2028,23 @@ CONFIG_RTC_DRV_XGENE                            policy<{'arm64': '-'}>
 CONFIG_RTD119X_WATCHDOG                         policy<{'arm64': '-'}>
 CONFIG_RTK_SYSTIMER                             policy<{'arm64': '-'}>
 CONFIG_RTSN                                     policy<{'arm64': '-'}>
-CONFIG_RUSTC_VERSION_TEXT                       policy<{'arm64': '"rustc 1.93.1 (01f6ddf75 2026-02-11)"'}>
+CONFIG_RUSTC_HAS_COERCE_POINTEE                 policy<{'arm64': 'y', 'arm64-qcom': '-'}>
+CONFIG_RUSTC_HAS_FILE_AS_C_STR                  policy<{'arm64': 'y', 'arm64-qcom': '-'}>
+CONFIG_RUSTC_HAS_FILE_WITH_NUL                  policy<{'arm64': 'y', 'arm64-qcom': '-'}>
+CONFIG_RUSTC_HAS_SLICE_AS_FLATTENED             policy<{'arm64': 'y', 'arm64-qcom': '-'}>
+CONFIG_RUSTC_HAS_SPAN_FILE                      policy<{'arm64': 'y', 'arm64-qcom': '-'}>
+CONFIG_RUSTC_HAS_UNNECESSARY_TRANSMUTES         policy<{'arm64': 'y', 'arm64-qcom': '-'}>
+CONFIG_RUSTC_LLVM_VERSION                       policy<{'arm64': '210108', 'arm64-qcom': '170006'}>
+CONFIG_RUSTC_SUPPORTS_ARM64                     policy<{'arm64': 'y', 'arm64-qcom': '-'}>
+CONFIG_RUSTC_VERSION                            policy<{'arm64': '109301', 'arm64-qcom': '107500'}>
+CONFIG_RUSTC_VERSION_TEXT                       policy<{'arm64': '"rustc 1.93.1 (01f6ddf75 2026-02-11) (built from a source tarball)"', 'arm64-qcom': '-'}>
+CONFIG_RUST_BITMAP_HARDENED                     policy<{'arm64': 'n', 'arm64-qcom': '-'}>
+CONFIG_RUST_BUILD_ASSERT_ALLOW                  policy<{'arm64': 'n', 'arm64-qcom': '-'}>
+CONFIG_RUST_DEBUG_ASSERTIONS                    policy<{'arm64': 'n', 'arm64-qcom': '-'}>
+CONFIG_RUST_FW_LOADER_ABSTRACTIONS              policy<{'arm64': 'y', 'arm64-qcom': '-'}>
+CONFIG_RUST_IS_AVAILABLE                        policy<{'arm64': 'y', 'arm64-qcom': '-'}>
+CONFIG_RUST_OVERFLOW_CHECKS                     policy<{'arm64': 'y', 'arm64-qcom': '-'}>
+CONFIG_RUST_PHYLIB_ABSTRACTIONS                 policy<{'arm64': 'y', 'arm64-qcom': '-'}>
 CONFIG_RZG2L_ADC                                policy<{'arm64': '-'}>
 CONFIG_RZG2L_THERMAL                            policy<{'arm64': '-'}>
 CONFIG_RZG3E_THERMAL                            policy<{'arm64': '-'}>
@@ -2007,11 +2054,13 @@ CONFIG_RZ_DMAC                                  policy<{'arm64': '-'}>
 CONFIG_RZ_MTU3                                  policy<{'arm64': '-'}>
 CONFIG_RZ_MTU3_CNT                              policy<{'arm64': '-'}>
 CONFIG_S32G_WDT                                 policy<{'arm64': '-'}>
+CONFIG_SAMPLES_RUST                             policy<{'arm64': 'n', 'arm64-qcom': '-'}>
 CONFIG_SAMPLE_CORESIGHT_SYSCFG                  policy<{'arm64': 'n'}>
 CONFIG_SATA_AHCI_SEATTLE                        policy<{'arm64': '-'}>
 CONFIG_SATA_RCAR                                policy<{'arm64': '-'}>
 CONFIG_SC27XX_ADC                               policy<{'arm64': '-'}>
-CONFIG_SCMI_QCOM_MEMLAT_DEVFREQ                 policy<{'arm64': 'm'}>
+CONFIG_SCHED_DEBUG                              policy<{'arm64-qcom': '-'}>
+CONFIG_SCMI_QCOM_MEMLAT_DEVFREQ                 policy<{'arm64': 'y', 'arm64-qcom': 'm'}>
 CONFIG_SCSI_UFS_AMD_VERSAL2                     policy<{'arm64': '-'}>
 CONFIG_SCSI_UFS_HISI                            policy<{'arm64': '-'}>
 CONFIG_SCSI_UFS_MEDIATEK                        policy<{'arm64': '-'}>
@@ -2510,6 +2559,7 @@ CONFIG_TI_SCI_PM_DOMAINS                        policy<{'arm64': '-'}>
 CONFIG_TI_SCI_PROTOCOL                          policy<{'arm64': '-'}>
 CONFIG_TI_SYSC                                  policy<{'arm64': '-'}>
 CONFIG_TI_SYSCON_CLK                            policy<{'arm64': '-'}>
+CONFIG_TOOLS_SUPPORT_RELR                       policy<{'arm64': 'y', 'arm64-qcom': '-'}>
 CONFIG_TOUCHSCREEN_GOODIX_BERLIN_I2C            policy<{'arm64': 'n'}>
 CONFIG_TOUCHSCREEN_SUN4I                        policy<{'arm64': '-'}>
 CONFIG_TOUCHSCREEN_TI_AM335X_TSC                policy<{'arm64': '-'}>
@@ -2572,6 +2622,7 @@ CONFIG_V4L2_ISP                                 policy<{'arm64': '-'}>
 CONFIG_V4L2_JPEG_HELPER                         policy<{'arm64': '-'}>
 CONFIG_V4L2_VP9                                 policy<{'arm64': '-'}>
 CONFIG_VCPU_STALL_DETECTOR                      policy<{'arm64': 'y'}>
+CONFIG_VERSION_SIGNATURE                        policy<{'arm64': '""', 'arm64-qcom': '"Ubuntu 7.0.0-1006.8-qcom 7.0.6"'}>
 CONFIG_VFIO_FSL_MC                              policy<{'arm64': '-'}>
 CONFIG_VHOST                                    policy<{'arm64': 'y'}>
 CONFIG_VHOST_IOTLB                              policy<{'arm64': 'y'}>
@@ -2653,7 +2704,12 @@ CONFIG_VIRTIO_VSOCKETS_COMMON                   policy<{'arm64': 'y'}>
 CONFIG_VISCONTI_WATCHDOG                        policy<{'arm64': '-'}>
 CONFIG_VMAP_PFN                                 policy<{'arm64': '-'}>
 CONFIG_VSOCKETS                                 policy<{'arm64': 'y'}>
+CONFIG_VSOCKETS_DIAG                            policy<{'arm64': 'm', 'arm64-qcom': 'n'}>
+CONFIG_VSOCKETS_LOOPBACK                        policy<{'arm64': 'm', 'arm64-qcom': 'n'}>
 CONFIG_W1_MASTER_MXC                            policy<{'arm64': '-'}>
+CONFIG_WATCHDOG_PRETIMEOUT_DEFAULT_GOV_NOOP     policy<{'arm64': 'y', 'arm64-qcom': 'n'}>
+CONFIG_WATCHDOG_PRETIMEOUT_DEFAULT_GOV_PANIC    policy<{'arm64': 'n', 'arm64-qcom': 'y'}>
+CONFIG_WATCHDOG_PRETIMEOUT_GOV_PANIC            policy<{'arm64': 'm', 'arm64-qcom': 'y'}>
 CONFIG_WLAN_VENDOR_BCMDHD                       policy<{'arm64': '-'}>
 CONFIG_WQ_POWER_EFFICIENT_DEFAULT               policy<{'arm64': 'n'}>
 CONFIG_XE_VFIO_PCI                              policy<{'arm64': '-'}>
@@ -2663,6 +2719,7 @@ CONFIG_XGENE_SLIMPRO_MBOX                       policy<{'arm64': '-'}>
 CONFIG_XILINX_AMS                               policy<{'arm64': '-'}>
 CONFIG_XLNX_EVENT_MANAGER                       policy<{'arm64': '-'}>
 CONFIG_XLNX_R5_REMOTEPROC                       policy<{'arm64': '-'}>
+CONFIG_ZRAM                                     policy<{'arm64': 'm', 'arm64-qcom': 'y'}>
 CONFIG_ZYNQMP_FIRMWARE                          policy<{'arm64': '-'}>
 CONFIG_ZYNQMP_FIRMWARE_DEBUG                    policy<{'arm64': '-'}>
 CONFIG_ZYNQMP_IPI_MBOX                          policy<{'arm64': '-'}>
