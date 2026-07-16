@@ -1345,36 +1345,20 @@
 	};
 };
 
-&thermal_gpuss_0 {
-	trips {
-		trip-point0 {
-			temperature = <105000>;
-		};
-	};
+&gpuss0_alert0 {
+	temperature = <105000>;
 };
 
-&thermal_gpuss_1 {
-	trips {
-		trip-point0 {
-			temperature = <105000>;
-		};
-	};
+&gpuss1_alert0 {
+	temperature = <105000>;
 };
 
-&thermal_gpuss_2 {
-	trips {
-		trip-point0 {
-			temperature = <105000>;
-		};
-	};
+&gpuss2_alert0 {
+	temperature = <105000>;
 };
 
-&thermal_gpuss_3 {
-	trips {
-		trip-point0 {
-			temperature = <105000>;
-		};
-	};
+&gpuss3_alert0 {
+	temperature = <105000>;
 };
 
 &tlmm {
