@@ -124,8 +124,10 @@ CONFIG_TOUCHSCREEN_APPLE_Z2                     note<'TODO: update note'>
 # ---- Annotations without notes ----
 
 CONFIG_AC97_BUS                                 policy<{'arm64': 'y'}>
+CONFIG_ACPI_AEST                                policy<{'arm64': 'n'}>
 CONFIG_ADI_AXI_ADC                              policy<{'arm64': '-'}>
 CONFIG_ADI_AXI_DAC                              policy<{'arm64': '-'}>
+CONFIG_AEST                                     policy<{'arm64': 'y'}>
 CONFIG_AHCI_IMX                                 policy<{'arm64': '-'}>
 CONFIG_AHCI_MTK                                 policy<{'arm64': '-'}>
 CONFIG_AHCI_MVEBU                               policy<{'arm64': '-'}>
@@ -329,6 +331,7 @@ CONFIG_CLK_ELIZA_DISPCC                         policy<{'arm64-qcom': 'y', 'arm6
 CONFIG_CLK_ELIZA_GCC                            policy<{'arm64-qcom': 'y', 'arm64-qcom-rt': 'm'}>
 CONFIG_CLK_ELIZA_TCSRCC                         policy<{'arm64-qcom': 'y', 'arm64-qcom-rt': 'm'}>
 CONFIG_CLK_GLYMUR_CAMCC                         policy<{'arm64-qcom': 'y', 'arm64-qcom-rt': 'm'}>
+CONFIG_CLK_GLYMUR_EVACC                         policy<{'arm64': 'm'}>
 CONFIG_CLK_GLYMUR_GCC                           policy<{'arm64': 'y'}>
 CONFIG_CLK_GLYMUR_GPUCC                         policy<{'arm64': 'y'}>
 CONFIG_CLK_GLYMUR_VIDEOCC                       policy<{'arm64': 'y'}>
@@ -397,6 +400,7 @@ CONFIG_CLK_RK3588                               policy<{'arm64': '-'}>
 CONFIG_CLK_RV1126B                              policy<{'arm64': '-'}>
 CONFIG_CLK_RZG2L                                policy<{'arm64': '-'}>
 CONFIG_CLK_RZV2H                                policy<{'arm64': '-'}>
+CONFIG_CLK_SHIKRA_AUDIOCORECC                   policy<{'arm64': 'y'}>
 CONFIG_CLK_SHIKRA_DISPCC                        policy<{'arm64': 'm'}>
 CONFIG_CLK_SHIKRA_GCC                           policy<{'arm64': 'y'}>
 CONFIG_CLK_SHIKRA_GPUCC                         policy<{'arm64': 'm'}>
@@ -754,6 +758,7 @@ CONFIG_DRM_INNO_HDMI                            policy<{'arm64': '-'}>
 CONFIG_DRM_KMB_DISPLAY                          policy<{'arm64': '-'}>
 CONFIG_DRM_LOGICVC                              policy<{'arm64': 'n'}>
 CONFIG_DRM_LONTIUM_LT8713SX                     policy<{'arm64': 'm'}>
+CONFIG_DRM_LONTIUM_LT9611C                      policy<{'arm64': 'm'}>
 CONFIG_DRM_MEDIATEK                             policy<{'arm64': '-'}>
 CONFIG_DRM_MEDIATEK_DP                          policy<{'arm64': '-'}>
 CONFIG_DRM_MEDIATEK_HDMI                        policy<{'arm64': '-'}>
@@ -1379,6 +1384,7 @@ CONFIG_NVMEM_ZYNQMP                             policy<{'arm64': '-'}>
 CONFIG_NVME_APPLE                               policy<{'arm64': '-'}>
 CONFIG_NXP_SAR_ADC                              policy<{'arm64': '-'}>
 CONFIG_NXP_STM_TIMER                            policy<{'arm64': '-'}>
+CONFIG_OF_AEST                                  policy<{'arm64': 'y'}>
 CONFIG_OLPC_EC                                  policy<{'arm64': '-'}>
 CONFIG_OLPC_XO175                               policy<{'arm64': '-'}>
 CONFIG_OLPC_XO175_EC                            policy<{'arm64': '-'}>
@@ -1793,6 +1799,7 @@ CONFIG_QCOM_APR                                 policy<{'arm64': 'y'}>
 CONFIG_QCOM_BAM_DMA                             policy<{'arm64': 'y'}>
 CONFIG_QCOM_CLK_APCC_MSM8996                    policy<{'arm64': 'y'}>
 CONFIG_QCOM_CLK_APCS_MSM8916                    policy<{'arm64': 'y'}>
+CONFIG_QCOM_CLK_GP_MND                          policy<{'arm64': 'y'}>
 CONFIG_QCOM_CLK_SMD_RPM                         policy<{'arm64': 'y'}>
 CONFIG_QCOM_CPR                                 policy<{'arm64': 'y'}>
 CONFIG_QCOM_CPUCP_MBOX                          policy<{'arm64': 'y'}>
@@ -1841,6 +1848,7 @@ CONFIG_QCOM_SMP2P                               policy<{'arm64': 'y'}>
 CONFIG_QCOM_SMP2P_SLEEPSTATE                    policy<{'arm64': '-'}>
 CONFIG_QCOM_SMSM                                policy<{'arm64': 'y'}>
 CONFIG_QCOM_SOC_DEBUG                           policy<{'arm64': '-'}>
+CONFIG_QCOM_SPEL                                policy<{'arm64': 'y'}>
 CONFIG_QCOM_SPMI_ADC5_GEN3                      policy<{'arm64': 'm'}>
 CONFIG_QCOM_SPMI_ADC_TM5_GEN3                   policy<{'arm64': 'm'}>
 CONFIG_QCOM_SPMI_MBG_TM                         policy<{'arm64': '-'}>
@@ -1989,6 +1997,7 @@ CONFIG_RTC_DRV_XGENE                            policy<{'arm64': '-'}>
 CONFIG_RTD119X_WATCHDOG                         policy<{'arm64': '-'}>
 CONFIG_RTK_SYSTIMER                             policy<{'arm64': '-'}>
 CONFIG_RTSN                                     policy<{'arm64': '-'}>
+CONFIG_RUSTC_VERSION_TEXT                       policy<{'arm64': '"rustc 1.93.1 (01f6ddf75 2026-02-11)"'}>
 CONFIG_RZG2L_ADC                                policy<{'arm64': '-'}>
 CONFIG_RZG2L_THERMAL                            policy<{'arm64': '-'}>
 CONFIG_RZG3E_THERMAL                            policy<{'arm64': '-'}>
