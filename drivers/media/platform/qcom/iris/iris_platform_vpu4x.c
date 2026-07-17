@@ -62,23 +62,12 @@ static struct platform_inst_caps iris_inst_cap_vpu4x = {
 	.mb_cycles_vpp = 200,
 	.mb_cycles_fw = 489583,
 	.mb_cycles_fw_vpp = 66234,
-	.num_comv = 0,
 	.max_frame_rate = MAXIMUM_FPS,
 	.max_operating_rate = MAXIMUM_FPS,
 };
 
-static struct ubwc_config_data iris_ubwc_config_vpu4x = {
-	.max_channels = 8,
-	.mal_length = 32,
-	.highest_bank_bit = 16,
-	.bank_swzl_level = 0,
-	.bank_swz2_level = 1,
-	.bank_swz3_level = 1,
-	.bank_spreading = 1,
-};
-
 const struct iris_platform_data kaanapali_data = {
-	.firmware_desc = &iris_vpu40_p2_s7_gen2_desc,
+	.firmware_desc_gen2 = &iris_vpu40_p2_s7_gen2_desc,
 	.vpu_ops = &iris_vpu4x_ops,
 	.icc_tbl = iris_icc_info_vpu4x,
 	.icc_tbl_size = ARRAY_SIZE(iris_icc_info_vpu4x),
@@ -99,7 +88,6 @@ const struct iris_platform_data kaanapali_data = {
 	.inst_caps = &iris_inst_cap_vpu4x,
 	.tz_cp_config_data = tz_cp_config_kaanapali,
 	.tz_cp_config_data_size = ARRAY_SIZE(tz_cp_config_kaanapali),
-	.ubwc_config = &iris_ubwc_config_vpu4x,
 	.num_vpp_pipe = 2,
 	.max_session_count = 16,
 	.max_core_mbpf = NUM_MBS_8K * 2,

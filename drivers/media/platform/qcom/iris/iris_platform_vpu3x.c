@@ -19,31 +19,25 @@
 #include "iris_platform_sm8750.h"
 #include "iris_platform_x1p42100.h"
 
-const struct iris_firmware_desc iris_vpu36_p4_s7_gen2_desc = {
-	.firmware_data = &iris_hfi_gen2_data,
-	.get_vpu_buffer_size = iris_vpu_buf_size,
-	.fwname = "qcom/vpu/vpu36_p4_s7.mbn",
-};
-
-const struct iris_firmware_desc iris_vpu30_p4_s6_gen2_desc = {
+static const struct iris_firmware_desc iris_vpu30_p4_s6_gen2_desc = {
 	.firmware_data = &iris_hfi_gen2_data,
 	.get_vpu_buffer_size = iris_vpu_buf_size,
 	.fwname = "qcom/vpu/vpu30_p4_s6.mbn",
 };
 
-const struct iris_firmware_desc iris_vpu30_p4_gen2_desc = {
+static const struct iris_firmware_desc iris_vpu30_p4_gen2_desc = {
 	.firmware_data = &iris_hfi_gen2_data,
 	.get_vpu_buffer_size = iris_vpu_buf_size,
 	.fwname = "qcom/vpu/vpu30_p4.mbn",
 };
 
-const struct iris_firmware_desc iris_vpu33_p4_gen2_desc = {
+static const struct iris_firmware_desc iris_vpu33_p4_gen2_desc = {
 	.firmware_data = &iris_hfi_gen2_data,
 	.get_vpu_buffer_size = iris_vpu33_buf_size,
 	.fwname = "qcom/vpu/vpu33_p4.mbn",
 };
 
-const struct iris_firmware_desc iris_vpu35_p4_gen2_desc = {
+static const struct iris_firmware_desc iris_vpu35_p4_gen2_desc = {
 	.firmware_data = &iris_hfi_gen2_data,
 	.get_vpu_buffer_size = iris_vpu33_buf_size,
 	.fwname = "qcom/vpu/vpu35_p4.mbn",
@@ -99,16 +93,6 @@ static const char * const iris_opp_clk_table_vpu3x[] = {
 	NULL,
 };
 
-static struct ubwc_config_data iris_ubwc_config_vpu3x = {
-	.max_channels = 8,
-	.mal_length = 32,
-	.highest_bank_bit = 16,
-	.bank_swzl_level = 0,
-	.bank_swz2_level = 1,
-	.bank_swz3_level = 1,
-	.bank_spreading = 1,
-};
-
 static const struct tz_cp_config tz_cp_config_vpu3[] = {
 	{
 		.cp_start = 0,
@@ -116,6 +100,38 @@ static const struct tz_cp_config tz_cp_config_vpu3[] = {
 		.cp_nonpixel_start = 0x01000000,
 		.cp_nonpixel_size = 0x24800000,
 	},
+};
+
+/*
+ * Shares most of SM8550 data except:
+ * - inst_caps to platform_inst_cap_qcs8300
+ */
+const struct iris_platform_data qcs8300_data = {
+	.firmware_desc_gen2 = &iris_vpu30_p4_s6_gen2_desc,
+	.vpu_ops = &iris_vpu3_ops,
+	.icc_tbl = iris_icc_info_vpu3x,
+	.icc_tbl_size = ARRAY_SIZE(iris_icc_info_vpu3x),
+	.clk_rst_tbl = sm8550_clk_reset_table,
+	.clk_rst_tbl_size = ARRAY_SIZE(sm8550_clk_reset_table),
+	.bw_tbl_dec = iris_bw_table_dec_vpu3x,
+	.bw_tbl_dec_size = ARRAY_SIZE(iris_bw_table_dec_vpu3x),
+	.pmdomain_tbl = &iris_pmdomain_table_vpu3x,
+	.opp_pd_tbl = iris_opp_pd_table_vpu3x,
+	.opp_pd_tbl_size = ARRAY_SIZE(iris_opp_pd_table_vpu3x),
+	.clk_tbl = sm8550_clk_table,
+	.clk_tbl_size = ARRAY_SIZE(sm8550_clk_table),
+	.opp_clk_tbl = iris_opp_clk_table_vpu3x,
+	/* Upper bound of DMA address range */
+	.dma_mask = 0xe0000000 - 1,
+	.inst_iris_fmts = iris_fmts_vpu3x_dec,
+	.inst_iris_fmts_size = ARRAY_SIZE(iris_fmts_vpu3x_dec),
+	.inst_caps = &platform_inst_cap_qcs8300,
+	.tz_cp_config_data = tz_cp_config_vpu3,
+	.tz_cp_config_data_size = ARRAY_SIZE(tz_cp_config_vpu3),
+	.num_vpp_pipe = 2,
+	.max_session_count = 16,
+	.max_core_mbpf = ((4096 * 2176) / 256) * 4,
+	.max_core_mbps = (((3840 * 2176) / 256) * 120),
 };
 
 static int sm8550_init_cb_devs(struct iris_core *core)
@@ -147,6 +163,12 @@ err_unreg_dev_np:
 	return PTR_ERR(dev);
 }
 
+const struct iris_firmware_desc iris_vpu36_p4_s7_gen2_desc = {
+	.firmware_data = &iris_hfi_gen2_data,
+	.get_vpu_buffer_size = iris_vpu_buf_size,
+	.fwname = "qcom/vpu/vpu36_p4_s7.mbn",
+};
+
 static void sm8550_deinit_cb_devs(struct iris_core *core)
 {
 	if (core->dev_np)
@@ -160,7 +182,7 @@ static void sm8550_deinit_cb_devs(struct iris_core *core)
 }
 
 const struct iris_platform_data glymur_data = {
-	.firmware_desc = &iris_vpu36_p4_s7_gen2_desc,
+	.firmware_desc_gen2 = &iris_vpu36_p4_s7_gen2_desc,
 	.vpu_ops = &iris_vpu36_ops,
 	.icc_tbl = iris_icc_info_vpu3x,
 	.icc_tbl_size = ARRAY_SIZE(iris_icc_info_vpu3x),
@@ -181,7 +203,6 @@ const struct iris_platform_data glymur_data = {
 	.inst_caps = &platform_inst_cap_sm8550,
 	.tz_cp_config_data = iris_glymur_tz_cp_config,
 	.tz_cp_config_data_size = ARRAY_SIZE(iris_glymur_tz_cp_config),
-	.ubwc_config = &iris_ubwc_config_vpu3x,
 	.num_vpp_pipe = 4,
 	.max_session_count = 16,
 	.max_core_mbpf = NUM_MBS_8K * 2,
@@ -189,41 +210,8 @@ const struct iris_platform_data glymur_data = {
 	.dual_core = true,
 };
 
-/*
- * Shares most of SM8550 data except:
- * - inst_caps to platform_inst_cap_qcs8300
- */
-const struct iris_platform_data qcs8300_data = {
-	.firmware_desc = &iris_vpu30_p4_s6_gen2_desc,
-	.vpu_ops = &iris_vpu3_ops,
-	.icc_tbl = iris_icc_info_vpu3x,
-	.icc_tbl_size = ARRAY_SIZE(iris_icc_info_vpu3x),
-	.clk_rst_tbl = sm8550_clk_reset_table,
-	.clk_rst_tbl_size = ARRAY_SIZE(sm8550_clk_reset_table),
-	.bw_tbl_dec = iris_bw_table_dec_vpu3x,
-	.bw_tbl_dec_size = ARRAY_SIZE(iris_bw_table_dec_vpu3x),
-	.pmdomain_tbl = &iris_pmdomain_table_vpu3x,
-	.opp_pd_tbl = iris_opp_pd_table_vpu3x,
-	.opp_pd_tbl_size = ARRAY_SIZE(iris_opp_pd_table_vpu3x),
-	.clk_tbl = sm8550_clk_table,
-	.clk_tbl_size = ARRAY_SIZE(sm8550_clk_table),
-	.opp_clk_tbl = iris_opp_clk_table_vpu3x,
-	/* Upper bound of DMA address range */
-	.dma_mask = 0xe0000000 - 1,
-	.inst_iris_fmts = iris_fmts_vpu3x_dec,
-	.inst_iris_fmts_size = ARRAY_SIZE(iris_fmts_vpu3x_dec),
-	.inst_caps = &platform_inst_cap_qcs8300,
-	.tz_cp_config_data = tz_cp_config_vpu3,
-	.tz_cp_config_data_size = ARRAY_SIZE(tz_cp_config_vpu3),
-	.ubwc_config = &iris_ubwc_config_vpu3x,
-	.num_vpp_pipe = 2,
-	.max_session_count = 16,
-	.max_core_mbpf = ((4096 * 2176) / 256) * 4,
-	.max_core_mbps = (((3840 * 2176) / 256) * 120),
-};
-
 const struct iris_platform_data sm8550_data = {
-	.firmware_desc = &iris_vpu30_p4_gen2_desc,
+	.firmware_desc_gen2 = &iris_vpu30_p4_gen2_desc,
 	.vpu_ops = &iris_vpu3_ops,
 	.init_cb_devs = sm8550_init_cb_devs,
 	.deinit_cb_devs = sm8550_deinit_cb_devs,
@@ -246,7 +234,6 @@ const struct iris_platform_data sm8550_data = {
 	.inst_caps = &platform_inst_cap_sm8550,
 	.tz_cp_config_data = tz_cp_config_vpu3,
 	.tz_cp_config_data_size = ARRAY_SIZE(tz_cp_config_vpu3),
-	.ubwc_config = &iris_ubwc_config_vpu3x,
 	.num_vpp_pipe = 4,
 	.max_session_count = 16,
 	.max_core_mbpf = NUM_MBS_8K * 2,
@@ -260,7 +247,7 @@ const struct iris_platform_data sm8550_data = {
  * - controller_rst_tbl to sm8650_controller_reset_table
  */
 const struct iris_platform_data sm8650_data = {
-	.firmware_desc = &iris_vpu33_p4_gen2_desc,
+	.firmware_desc_gen2 = &iris_vpu33_p4_gen2_desc,
 	.vpu_ops = &iris_vpu33_ops,
 	.icc_tbl = iris_icc_info_vpu3x,
 	.icc_tbl_size = ARRAY_SIZE(iris_icc_info_vpu3x),
@@ -283,7 +270,6 @@ const struct iris_platform_data sm8650_data = {
 	.inst_caps = &platform_inst_cap_sm8550,
 	.tz_cp_config_data = tz_cp_config_vpu3,
 	.tz_cp_config_data_size = ARRAY_SIZE(tz_cp_config_vpu3),
-	.ubwc_config = &iris_ubwc_config_vpu3x,
 	.num_vpp_pipe = 4,
 	.max_session_count = 16,
 	.max_core_mbpf = NUM_MBS_8K * 2,
@@ -291,7 +277,7 @@ const struct iris_platform_data sm8650_data = {
 };
 
 const struct iris_platform_data sm8750_data = {
-	.firmware_desc = &iris_vpu35_p4_gen2_desc,
+	.firmware_desc_gen2 = &iris_vpu35_p4_gen2_desc,
 	.vpu_ops = &iris_vpu35_ops,
 	.icc_tbl = iris_icc_info_vpu3x,
 	.icc_tbl_size = ARRAY_SIZE(iris_icc_info_vpu3x),
@@ -312,7 +298,6 @@ const struct iris_platform_data sm8750_data = {
 	.inst_caps = &platform_inst_cap_sm8550,
 	.tz_cp_config_data = tz_cp_config_vpu3,
 	.tz_cp_config_data_size = ARRAY_SIZE(tz_cp_config_vpu3),
-	.ubwc_config = &iris_ubwc_config_vpu3x,
 	.num_vpp_pipe = 4,
 	.max_session_count = 16,
 	.max_core_mbpf = NUM_MBS_8K * 2,
@@ -320,7 +305,7 @@ const struct iris_platform_data sm8750_data = {
 };
 
 const struct iris_platform_data x1p42100_data = {
-	.firmware_desc = &iris_vpu30_p4_gen2_desc,
+	.firmware_desc_gen2 = &iris_vpu30_p4_gen2_desc,
 	.vpu_ops = &iris_vpu3_purwa_ops,
 	.init_cb_devs = sm8550_init_cb_devs,
 	.deinit_cb_devs = sm8550_deinit_cb_devs,
@@ -343,7 +328,6 @@ const struct iris_platform_data x1p42100_data = {
 	.inst_caps = &platform_inst_cap_sm8550,
 	.tz_cp_config_data = tz_cp_config_vpu3,
 	.tz_cp_config_data_size = ARRAY_SIZE(tz_cp_config_vpu3),
-	.ubwc_config = &iris_ubwc_config_vpu3x,
 	.num_vpp_pipe = 1,
 	.max_session_count = 16,
 	.max_core_mbpf = NUM_MBS_8K * 2,

@@ -30,6 +30,8 @@ enum domain_type {
 	DECODER	= BIT(1),
 };
 
+struct qcom_ubwc_cfg_data;
+
 enum iris_vcodec_core_id {
 	IRIS_VCODEC0 = 1,
 	IRIS_VCODEC1,
@@ -62,6 +64,7 @@ enum iris_vcodec_core_id {
  * @iris_platform_data: a structure for platform data
  * @iris_firmware_data: a pointer to the firmware (or HFI) specific data
  * @iris_firmware_desc: a pointer to the firmware-specific descriptive data
+ * @ubwc_cfg: UBWC configuration for the platform
  * @state: current state of core
  * @iface_q_table_daddr: device address for interface queue table memory
  * @sfr_daddr: device address for SFR (Sub System Failure Reason) register memory
@@ -114,6 +117,7 @@ struct iris_core {
 	const struct iris_platform_data		*iris_platform_data;
 	const struct iris_firmware_data		*iris_firmware_data;
 	const struct iris_firmware_desc		*iris_firmware_desc;
+	const struct qcom_ubwc_cfg_data		*ubwc_cfg;
 	enum iris_core_state			state;
 	dma_addr_t				iface_q_table_daddr;
 	dma_addr_t				sfr_daddr;
