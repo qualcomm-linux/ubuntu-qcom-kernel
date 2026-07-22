@@ -14,6 +14,12 @@
 
 #include "iris_platform_kaanapali.h"
 
+const struct iris_firmware_desc iris_vpu40_p2_s7_gen2_desc = {
+	.firmware_data = &iris_hfi_gen2_data,
+	.get_vpu_buffer_size = iris_vpu4x_buf_size,
+	.fwname = "qcom/vpu/vpu40_p2_s7.mbn",
+};
+
 static struct iris_fmt iris_fmts_vpu4x_dec[] = {
 	[IRIS_FMT_H264] = {
 		.pixfmt = V4L2_PIX_FMT_H264,
@@ -69,8 +75,7 @@ const struct iris_platform_data kaanapali_data = {
 	.clk_rst_tbl_size = ARRAY_SIZE(kaanapali_clk_reset_table),
 	.bw_tbl_dec = iris_bw_table_dec_vpu4x,
 	.bw_tbl_dec_size = ARRAY_SIZE(iris_bw_table_dec_vpu4x),
-	.pmdomain_tbl = kaanapali_pmdomain_table,
-	.pmdomain_tbl_size = ARRAY_SIZE(kaanapali_pmdomain_table),
+	.pmdomain_tbl = &kaanapali_pmdomain_table,
 	.opp_pd_tbl = iris_opp_pd_table_vpu4x,
 	.opp_pd_tbl_size = ARRAY_SIZE(iris_opp_pd_table_vpu4x),
 	.clk_tbl = kaanapali_clk_table,
@@ -78,7 +83,6 @@ const struct iris_platform_data kaanapali_data = {
 	.opp_clk_tbl = kaanapali_opp_clk_table,
 	/* Upper bound of DMA address range */
 	.dma_mask = 0xe0000000 - 1,
-	.fwname = "qcom/vpu/vpu40_p2_s7.mbn",
 	.inst_iris_fmts = iris_fmts_vpu4x_dec,
 	.inst_iris_fmts_size = ARRAY_SIZE(iris_fmts_vpu4x_dec),
 	.inst_caps = &iris_inst_cap_vpu4x,
