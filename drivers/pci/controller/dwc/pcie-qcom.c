@@ -1672,22 +1672,6 @@ static void qcom_pcie_icc_opp_update(struct qcom_pcie *pcie)
 	}
 }
 
-static int qcom_pcie_set_max_opp(struct device *dev)
-{
-	unsigned long max_freq = ULONG_MAX;
-	struct dev_pm_opp *opp;
-	int ret;
-
-	opp = dev_pm_opp_find_freq_floor(dev, &max_freq);
-	if (IS_ERR(opp))
-		return PTR_ERR(opp);
-
-	ret = dev_pm_opp_set_opp(dev, opp);
-	dev_pm_opp_put(opp);
-
-	return ret;
-}
-
 static int qcom_pcie_link_transition_count(struct seq_file *s, void *data)
 {
 	struct qcom_pcie *pcie = (struct qcom_pcie *)dev_get_drvdata(s->private);
@@ -1926,7 +1910,9 @@ static int qcom_pcie_probe(struct platform_device *pdev)
 	struct qcom_pcie_perst *perst, *tmp_perst;
 	struct qcom_pcie_port *port, *tmp_port;
 	const struct qcom_pcie_cfg *pcie_cfg;
+	unsigned long max_freq = ULONG_MAX;
 	struct device *dev = &pdev->dev;
+	struct dev_pm_opp *opp;
 	struct qcom_pcie *pcie;
 	struct dw_pcie_rp *pp;
 	struct resource *res;
@@ -2030,9 +2016,21 @@ static int qcom_pcie_probe(struct platform_device *pdev)
 	 * probe(), OPP will be updated using qcom_pcie_icc_opp_update().
 	 */
 	if (!ret) {
-		ret = qcom_pcie_set_max_opp(dev);
+		opp = dev_pm_opp_find_freq_floor(dev, &max_freq);
+		if (IS_ERR(opp)) {
+			ret = PTR_ERR(opp);
+			dev_err_probe(pci->dev, ret,
+				      "Unable to find max freq OPP\n");
+			goto err_pm_runtime_put;
+		} else {
+			ret = dev_pm_opp_set_opp(dev, opp);
+		}
+
+		dev_pm_opp_put(opp);
 		if (ret) {
-			dev_err_probe(dev, ret, "Failed to set max OPP in probe\n");
+			dev_err_probe(pci->dev, ret,
+				      "Failed to set OPP for freq %lu\n",
+				      max_freq);
 			goto err_pm_runtime_put;
 		}
 
@@ -2141,14 +2139,6 @@ static int qcom_pcie_suspend_noirq(struct device *dev)
 			}
 		}
 
-		if (pcie->use_pm_opp) {
-			ret = qcom_pcie_set_max_opp(dev);
-			if (ret) {
-				dev_err(dev, "Failed to set max OPP in resume: %d\n", ret);
-				return ret;
-			}
-		}
-
 		/*
 		 * Only disable CPU-PCIe interconnect path if the suspend is non-S2RAM.
 		 * Because on some platforms, DBI access can happen very late during the
@@ -2202,14 +2192,6 @@ static int qcom_pcie_resume_noirq(struct device *dev)
 			return ret;
 	} else {
 		if (pm_suspend_target_state != PM_SUSPEND_MEM) {
-			if (pcie->use_pm_opp) {
-				ret = qcom_pcie_set_max_opp(dev);
-				if (ret) {
-					dev_err(dev, "Failed to set max OPP in resume: %d\n", ret);
-					return ret;
-				}
-			}
-
 			ret = icc_enable(pcie->icc_cpu);
 			if (ret) {
 				dev_err(dev, "Failed to enable CPU-PCIe interconnect path: %d\n",
