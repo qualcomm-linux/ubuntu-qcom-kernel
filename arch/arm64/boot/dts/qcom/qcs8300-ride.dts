@@ -726,7 +726,6 @@
 	vmmc-supply = <&vreg_l8a>;
 	vqmmc-supply = <&vreg_s4a>;
 
-	supports-cqe;
 	non-removable;
 	no-sd;
 	no-sdio;
