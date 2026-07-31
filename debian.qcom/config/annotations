@@ -1406,7 +1406,7 @@ CONFIG_OWL_PM_DOMAINS                           policy<{'arm64': '-'}>
 CONFIG_OWL_PM_DOMAINS_HELPER                    policy<{'arm64': '-'}>
 CONFIG_OWL_TIMER                                policy<{'arm64': '-'}>
 CONFIG_PAGE_BLOCK_MAX_ORDER                     policy<{'arm64': '10'}>
-CONFIG_PANIC_TIMEOUT                            policy<{'arm64': '-1'}>
+CONFIG_PANIC_TIMEOUT                            policy<{'arm64': '0'}>
 CONFIG_PATA_IMX                                 policy<{'arm64': '-'}>
 CONFIG_PCIE_APPLE                               policy<{'arm64': '-'}>
 CONFIG_PCIE_APPLE_MSI_DOORBELL_ADDR             policy<{'arm64': '-'}>
