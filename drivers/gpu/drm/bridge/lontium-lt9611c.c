@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) 2026 Lontium Semiconductor, Inc.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/crc8.h>
@@ -15,6 +16,7 @@
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
+#include <linux/unaligned.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_bridge.h>
 #include <drm/drm_connector.h>
@@ -31,9 +33,47 @@
 
 #define FW_SIZE (64 * 1024)
 #define LT_PAGE_SIZE 256
-#define FW_FILE  "Lontium/lt9611c_fw.bin"
+#define FW_FILE  "lt9611c_fw.bin"
 #define LT9611C_CRC_POLYNOMIAL 0x31
 #define LT9611C_PAGE_CONTROL 0xff
+#define LT9611C_INFOFRAME_MAX_SIZE 32
+#define LT9611C_CMD_HDR_SIZE 4
+#define LT9611C_CMD_Y0_SIZE  1  /* Y0 echo byte in ACK response */
+#define LT9611C_EDID_BUF_SIZE 32
+
+struct lt9611c_cmd_hdr {
+	u8 func;
+	u8 type;
+	u8 seq;
+	u8 sep;
+};
+
+/* lt9611c_cmd_hdr.func values */
+#define LT9611C_FUNC_WRITE	0x57 /* 'W' */
+#define LT9611C_FUNC_READ	0x52 /* 'R' */
+#define LT9611C_FUNC_ACK	0x41 /* 'A' */
+
+/* lt9611c_cmd_hdr.type values */
+#define LT9611C_TYPE_MIPI	0x4d /* 'M' */
+#define LT9611C_TYPE_LVDS	0x4c /* 'L' */
+#define LT9611C_TYPE_HDMI	0x48 /* 'H' */
+#define LT9611C_TYPE_AUDIO	0x41 /* 'A' */
+#define LT9611C_TYPE_CUSTOM	0x43 /* 'C' */
+
+/* lt9611c_cmd_hdr.sep is always ':' */
+#define LT9611C_CMD_SEP		0x3a /* ':' */
+
+struct lt9611c_cmd {
+	struct lt9611c_cmd_hdr hdr;
+	const u8 *data;
+	size_t data_len;
+};
+
+struct lt9611c_rsp {
+	struct lt9611c_cmd_hdr hdr;
+	u8 *data;
+	unsigned int data_len;
+};
 
 enum lt9611_chip_type {
 	CHIP_LT9611C = 0,
@@ -41,11 +81,15 @@ enum lt9611_chip_type {
 	CHIP_LT9611UXD,
 };
 
-enum lt9611c_ports {
-	PORT_SWAP_A = 0,
-	PORT_SWAP_B,
-	PORT_SWAP_AB,
-	PORT_MAX,
+struct lt9611c_chip_data {
+	enum lt9611_chip_type chip_type;
+	unsigned long long max_tmds_rate;
+};
+
+static const struct lt9611c_chip_data lt9611c_chip_data[] = {
+	[CHIP_LT9611C]   = { CHIP_LT9611C,   340000000 },
+	[CHIP_LT9611EX]  = { CHIP_LT9611EX,  340000000 },
+	[CHIP_LT9611UXD] = { CHIP_LT9611UXD, 600000000 },
 };
 
 struct lt9611c {
@@ -53,23 +97,19 @@ struct lt9611c {
 	struct i2c_client *client;
 	struct drm_bridge bridge;
 	struct regmap *regmap;
-	/* Protects all accesses to registers by stopping the on-chip MCU */
-	struct mutex ocm_lock;
+	struct mutex mcu_lock;
 	struct work_struct work;
 	struct device_node *dsi0_node;
 	struct device_node *dsi1_node;
 	struct mipi_dsi_device *dsi0;
 	struct mipi_dsi_device *dsi1;
 	struct gpio_desc *reset_gpio;
-	struct gpio_desc *hdmi_gpio;
 	struct regulator_bulk_data supplies[2];
 	int fw_version;
 	/* Chip variant: C/EX/UXD */
 	enum lt9611_chip_type chip_type;
-	 /* HDMI cable connection status */
+	unsigned long long max_tmds_rate;
 	bool hdmi_connected;
-	/* Selected DSI port configuration */
-	int selected_port;
 };
 
 DECLARE_CRC8_TABLE(lt9611c_crc8_table);
@@ -95,9 +135,9 @@ static const struct regmap_config lt9611c_regmap_config = {
 	.num_ranges = ARRAY_SIZE(lt9611c_ranges),
 };
 
-static int lt9611c_read_write_flow(struct lt9611c *lt9611c, u8 *params,
-				   unsigned int param_count, u8 *return_buffer,
-				   unsigned int return_count)
+static int lt9611c_read_write_flow(struct lt9611c *lt9611c,
+				   const struct lt9611c_cmd *cmd,
+				   struct lt9611c_rsp *rsp)
 {
 	int ret;
 	unsigned int i;
@@ -107,64 +147,51 @@ static int lt9611c_read_write_flow(struct lt9611c *lt9611c, u8 *params,
 	regmap_write(lt9611c->regmap, 0xe0de, 0x01);
 
 	ret = regmap_read_poll_timeout(lt9611c->regmap, 0xe0ae, temp,
-				       temp == 0x01, 1000, 400 * 1000);
+				       temp == 0x01, 1000, 200 * 1000);
 	if (ret)
 		return -ETIMEDOUT;
 
-	for (i = 0; i < param_count && i < max_params; i++)
-		regmap_write(lt9611c->regmap, 0xe0b0 + i, params[i]);
+	ret = regmap_bulk_write(lt9611c->regmap, 0xe0b0, &cmd->hdr,
+				LT9611C_CMD_HDR_SIZE);
+	if (ret)
+		return ret;
+
+	for (i = 0; cmd->data && i < cmd->data_len &&
+	     (LT9611C_CMD_HDR_SIZE + i) < max_params; i++)
+		regmap_write(lt9611c->regmap,
+			     0xe0b0 + LT9611C_CMD_HDR_SIZE + i, cmd->data[i]);
 
 	regmap_write(lt9611c->regmap, 0xe0de, 0x02);
 
 	ret = regmap_read_poll_timeout(lt9611c->regmap, 0xe0ae, temp,
-				       temp == 0x02, 1000, 400 * 1000);
+				       temp == 0x02, 1000, 200 * 1000);
 	if (ret)
 		return -ETIMEDOUT;
 
-	return regmap_bulk_read(lt9611c->regmap, 0xe085, return_buffer,
-				return_count);
+	ret = regmap_bulk_read(lt9611c->regmap, 0xe085,
+			       &rsp->hdr, LT9611C_CMD_HDR_SIZE);
+	if (ret)
+		return ret;
+
+
+	if (rsp->data && rsp->data_len)
+		ret = regmap_bulk_read(lt9611c->regmap,
+				       0xe085 + LT9611C_CMD_HDR_SIZE,
+				       rsp->data, rsp->data_len);
+
+	return ret;
 }
 
-static int lt9611c_select_port(struct lt9611c *lt9611c, int port_select)
+static void lt9611c_lock(struct lt9611c *lt9611c)
 {
-	int ret;
-	u8 set_port_swap_cmd_A[6] = {0x57, 0x4d, 0x31, 0x3a, 0x01, 0xc0};
-	u8 set_port_swap_cmd_B[6] = {0x57, 0x4d, 0x31, 0x3a, 0x01, 0x40};
-	u8 set_port_swap_cmd_AB[6] = {0x57, 0x4d, 0x31, 0x3a, 0x02, 0xd0};
-	u8 set_port_swap_ret[5];
+	mutex_lock(&lt9611c->mcu_lock);
+	regmap_write(lt9611c->regmap, 0xe0ee, 0x01);
+}
 
-	if (!lt9611c)
-		return -EINVAL;
-
-	/* MCU must be running (0xe0ee=0x00) for lt9611c_read_write_flow */
-	guard(mutex)(&lt9611c->ocm_lock);
+static void lt9611c_unlock(struct lt9611c *lt9611c)
+{
 	regmap_write(lt9611c->regmap, 0xe0ee, 0x00);
-
-	switch (port_select) {
-	case PORT_SWAP_A:
-		ret = lt9611c_read_write_flow(lt9611c, set_port_swap_cmd_A,
-				6, set_port_swap_ret, 5);
-		if (ret < 0 || set_port_swap_ret[4] == 0)
-			return ret < 0 ? ret : -EIO;
-		break;
-
-	case PORT_SWAP_B:
-		ret = lt9611c_read_write_flow(lt9611c, set_port_swap_cmd_B,
-				6, set_port_swap_ret, 5);
-		if (ret < 0 || set_port_swap_ret[4] == 0)
-			return ret < 0 ? ret : -EIO;
-		break;
-
-	case PORT_SWAP_AB:
-		ret = lt9611c_read_write_flow(lt9611c, set_port_swap_cmd_AB,
-				6, set_port_swap_ret, 5);
-		if (ret < 0 || set_port_swap_ret[4] == 0)
-			return ret < 0 ? ret : -EIO;
-		break;
-	default:
-		return -EINVAL;
-	}
-	return 0;
+	mutex_unlock(&lt9611c->mcu_lock);
 }
 
 static void lt9611c_config_parameters(struct lt9611c *lt9611c)
@@ -212,7 +239,7 @@ static void lt9611c_erase_op(struct lt9611c *lt9611c, u32 addr)
 	regmap_multi_reg_write(lt9611c->regmap, seq_write, ARRAY_SIZE(seq_write));
 }
 
-static void read_flash_reg_status(struct lt9611c *lt9611c, unsigned int *status)
+static unsigned int read_flash_reg_status(struct lt9611c *lt9611c)
 {
 	const struct reg_sequence seq_write[] = {
 		REG_SEQ0(0xe103, 0x3f),
@@ -223,10 +250,15 @@ static void read_flash_reg_status(struct lt9611c *lt9611c, unsigned int *status)
 		REG_SEQ0(0xe055, 0x01),
 		REG_SEQ0(0xe058, 0x21),
 	};
+	unsigned int status;
+	int ret;
 
 	regmap_multi_reg_write(lt9611c->regmap, seq_write, ARRAY_SIZE(seq_write));
+	ret = regmap_read(lt9611c->regmap, 0xe05f, &status);
+	if (ret)
+		return 0xff;
 
-	regmap_read(lt9611c->regmap, 0xe05f, status);
+	return status;
 }
 
 static void lt9611c_crc_to_sram(struct lt9611c *lt9611c)
@@ -267,33 +299,29 @@ static void lt9611c_sram_to_flash(struct lt9611c *lt9611c, size_t addr)
 	regmap_multi_reg_write(lt9611c->regmap, seq_write, ARRAY_SIZE(seq_write));
 }
 
-static void lt9611c_block_erase(struct lt9611c *lt9611c)
+static int lt9611c_block_erase(struct lt9611c *lt9611c)
 {
 	struct device *dev = lt9611c->dev;
-	int i;
 	unsigned int block_num;
 	unsigned int flash_status = 0;
 	u32 flash_addr = 0;
+	int ret;
 
 	for (block_num = 0; block_num < 2; block_num++) {
-		flash_addr = (block_num * 0x008000);
+		flash_addr = block_num * 0x008000;
 		lt9611c_erase_op(lt9611c, flash_addr);
 		msleep(100);
-		i = 0;
-		while (1) {
-			read_flash_reg_status(lt9611c, &flash_status);
-			if ((flash_status & 0x01) == 0)
-				break;
-
-			if (i > 50)
-				break;
-
-			i++;
-			msleep(50);
+		ret = read_poll_timeout(read_flash_reg_status, flash_status,
+					!(flash_status & 0x01),
+					50 * USEC_PER_MSEC, 2500 * USEC_PER_MSEC,
+					false, lt9611c);
+		if (ret) {
+			dev_err(dev, "flash erase timeout for block %u\n", block_num);
+			return ret;
 		}
 	}
 
-	dev_dbg(dev, "erase flash done.\n");
+	return 0;
 }
 
 static int lt9611c_write_data(struct lt9611c *lt9611c, const struct firmware *fw, size_t addr)
@@ -307,7 +335,7 @@ static int lt9611c_write_data(struct lt9611c *lt9611c, const struct firmware *fw
 
 	data = fw->data;
 	size = fw->size;
-	page = (size + LT_PAGE_SIZE - 1) / LT_PAGE_SIZE;
+	page = DIV_ROUND_UP(size, LT_PAGE_SIZE);
 	if (page * LT_PAGE_SIZE > FW_SIZE) {
 		dev_err(dev, "firmware size out of range\n");
 		return -EINVAL;
@@ -364,32 +392,30 @@ static int lt9611c_write_crc(struct lt9611c *lt9611c, u8 fw_crc, size_t addr)
 static void lt9611c_reset(struct lt9611c *lt9611c)
 {
 	gpiod_set_value_cansleep(lt9611c->reset_gpio, 1);
-	msleep(20);
+	usleep_range(10000, 12000);
 
 	gpiod_set_value_cansleep(lt9611c->reset_gpio, 0);
-	msleep(20);
-
-	gpiod_set_value_cansleep(lt9611c->reset_gpio, 1);
 	msleep(400);
-
-	dev_dbg(lt9611c->dev, "lt9611c reset");
 }
 
 static int lt9611c_upgrade_result(struct lt9611c *lt9611c, u8 fw_crc)
 {
 	struct device *dev = lt9611c->dev;
 	unsigned int crc_result;
+	int ret;
 
 	regmap_write(lt9611c->regmap, 0xe0ee, 0x01);
-	regmap_read(lt9611c->regmap, 0xe021, &crc_result);
+	ret = regmap_read(lt9611c->regmap, 0xe021, &crc_result);
+	if (ret)
+		return dev_err_probe(dev, ret, "failed to read firmware crc\n");
 
 	if (crc_result != fw_crc) {
 		dev_err(dev, "lt9611c fw upgrade failed, expected crc=0x%02x, read crc=0x%02x\n",
 			fw_crc, crc_result);
-		return -1;
+		return -EIO;
 	}
 
-	dev_dbg(dev, "lt9611c firmware upgrade success, crc=0x%02x\n", crc_result);
+	dev_info(dev, "lt9611c firmware upgrade success, crc=0x%02x\n", crc_result);
 	return 0;
 }
 
@@ -402,12 +428,11 @@ static int lt9611c_firmware_upgrade(struct lt9611c *lt9611c)
 	u8 fw_crc;
 	int ret;
 
-	/* 1. load firmware */
+	/* load firmware — must happen outside the mcu_lock */
 	ret = request_firmware(&fw, FW_FILE, dev);
 	if (ret)
 		return dev_err_probe(dev, ret, "failed to load '%s'\n", FW_FILE);
 
-	/* 2. check size */
 	if (fw->size > total_size) {
 		dev_err(dev, "firmware too large (%zu > %zu)\n", fw->size, total_size);
 		ret = -EINVAL;
@@ -415,42 +440,46 @@ static int lt9611c_firmware_upgrade(struct lt9611c *lt9611c)
 	}
 	dev_dbg(dev, "firmware size: %zu bytes\n", fw->size);
 
-	/* 3. calculate crc8 */
 	buffer = kzalloc(total_size, GFP_KERNEL);
 	if (!buffer) {
 		ret = -ENOMEM;
 		goto out_release_fw;
 	}
 
-	memset(buffer, 0xff, total_size);
 	memcpy(buffer, fw->data, fw->size);
+	memset(buffer + fw->size, 0xff, total_size - fw->size);
 
 	fw_crc = crc8(lt9611c_crc8_table, buffer, total_size, 0);
 	kfree(buffer);
 
-	dev_dbg(dev, "firmware crc: 0x%02x\n", fw_crc);
-	dev_dbg(dev, "starting firmware upgrade, size: %zu bytes\n", fw->size);
+	dev_info(dev, "starting firmware upgrade, size: %zu bytes, crc: 0x%02x\n",
+		 fw->size, fw_crc);
 
-	/* 4. firmware upgrade */
+	/* hardware access requires mcu_lock */
+	lt9611c_lock(lt9611c);
+
 	lt9611c_config_parameters(lt9611c);
-	lt9611c_block_erase(lt9611c);
+	ret = lt9611c_block_erase(lt9611c);
+	if (ret < 0)
+		goto out_unlock;
 
 	ret = lt9611c_write_data(lt9611c, fw, 0);
 	if (ret < 0) {
 		dev_err(dev, "failed to write firmware data\n");
-		goto out_release_fw;
+		goto out_unlock;
 	}
 
 	ret = lt9611c_write_crc(lt9611c, fw_crc, FW_SIZE - 1);
 	if (ret < 0) {
 		dev_err(dev, "failed to write firmware crc\n");
-		goto out_release_fw;
+		goto out_unlock;
 	}
 
-	/* 5. check upgrade of result */
 	lt9611c_reset(lt9611c);
 	ret = lt9611c_upgrade_result(lt9611c, fw_crc);
 
+out_unlock:
+	lt9611c_unlock(lt9611c);
 out_release_fw:
 	release_firmware(fw);
 	return ret;
@@ -461,22 +490,9 @@ static struct lt9611c *bridge_to_lt9611c(struct drm_bridge *bridge)
 	return container_of(bridge, struct lt9611c, bridge);
 }
 
-/*read only*/
 static const struct lt9611c *bridge_to_lt9611c_const(const struct drm_bridge *bridge)
 {
-	return container_of(bridge, const struct lt9611c, bridge);
-}
-
-static void lt9611c_lock(struct lt9611c *lt9611c)
-{
-	mutex_lock(&lt9611c->ocm_lock);
-	regmap_write(lt9611c->regmap, 0xe0ee, 0x01);
-}
-
-static void lt9611c_unlock(struct lt9611c *lt9611c)
-{
-	regmap_write(lt9611c->regmap, 0xe0ee, 0x00);
-	mutex_unlock(&lt9611c->ocm_lock);
+	return container_of_const(bridge, struct lt9611c, bridge);
 }
 
 static irqreturn_t lt9611c_irq_thread_handler(int irq, void *dev_id)
@@ -485,39 +501,22 @@ static irqreturn_t lt9611c_irq_thread_handler(int irq, void *dev_id)
 	struct device *dev = lt9611c->dev;
 	int ret;
 	unsigned int irq_status;
-	u8 cmd[5] = {0x52, 0x48, 0x31, 0x3a, 0x00};
-	u8 data[5];
 
-	mutex_lock(&lt9611c->ocm_lock);
-
-	/* Ensure MCU is running for HPD status query */
-	regmap_write(lt9611c->regmap, 0xe0ee, 0x00);
+	guard(mutex)(&lt9611c->mcu_lock);
 
 	ret = regmap_read(lt9611c->regmap, 0xe084, &irq_status);
 	if (ret) {
 		dev_err(dev, "failed to read irq status: %d\n", ret);
-		mutex_unlock(&lt9611c->ocm_lock);
 		return IRQ_HANDLED;
 	}
 
-	if (!(irq_status & BIT(0))) {
-		mutex_unlock(&lt9611c->ocm_lock);
-		return IRQ_HANDLED;
-	}
+	if (!(irq_status & BIT(0)))
+		return IRQ_NONE;
 
-	ret = lt9611c_read_write_flow(lt9611c, cmd, ARRAY_SIZE(cmd), data, ARRAY_SIZE(data));
-	if (ret) {
-		dev_err(dev, "failed to read HPD status\n");
-	} else {
-		lt9611c->hdmi_connected = (data[4] == 0x02);
-		dev_dbg(dev, "HDMI %s\n", lt9611c->hdmi_connected ? "connected" : "disconnected");
-	}
-
-	regmap_write(lt9611c->regmap, 0xe0df, BIT(0));
+	/*Clear interrupt: hardware requires two writes with delay*/
+	regmap_write(lt9611c->regmap, 0xe0df, irq_status & BIT(0));
 	usleep_range(10000, 12000);
-	regmap_write(lt9611c->regmap, 0xe0df, 0x00);
-
-	mutex_unlock(&lt9611c->ocm_lock);
+	regmap_write(lt9611c->regmap, 0xe0df, irq_status & (~BIT(0)));
 
 	schedule_work(&lt9611c->work);
 
@@ -527,11 +526,30 @@ static irqreturn_t lt9611c_irq_thread_handler(int irq, void *dev_id)
 static void lt9611c_hpd_work(struct work_struct *work)
 {
 	struct lt9611c *lt9611c = container_of(work, struct lt9611c, work);
+	struct device *dev = lt9611c->dev;
+	static const u8 hpd_data[] = { 0x00 };
+	struct lt9611c_cmd cmd = {
+		.hdr = { LT9611C_FUNC_READ, LT9611C_TYPE_HDMI, 0x31, LT9611C_CMD_SEP },
+		.data = hpd_data,
+		.data_len = 1,
+	};
+	u8 hpd_status;
+	struct lt9611c_rsp rsp = { .data = &hpd_status, .data_len = 1 };
 	bool connected;
+	int ret;
 
-	mutex_lock(&lt9611c->ocm_lock);
+	/* Added delay as need time to reflect hpd after interrupt*/
+	msleep(200);
+
+	mutex_lock(&lt9611c->mcu_lock);
+	ret = lt9611c_read_write_flow(lt9611c, &cmd, &rsp);
+	if (ret)
+		dev_err(dev, "failed to read HPD status\n");
+	else
+		lt9611c->hdmi_connected = (hpd_status == 0x02);
+
 	connected = lt9611c->hdmi_connected;
-	mutex_unlock(&lt9611c->ocm_lock);
+	mutex_unlock(&lt9611c->mcu_lock);
 
 	drm_bridge_hpd_notify(&lt9611c->bridge,
 			      connected ? connector_status_connected :
@@ -596,14 +614,8 @@ lt9611c_hdmi_tmds_char_rate_valid(const struct drm_bridge *bridge,
 {
 	const struct lt9611c *lt9611c = bridge_to_lt9611c_const(bridge);
 
-	if (lt9611c->chip_type == CHIP_LT9611UXD) {
-		if (tmds_rate > 600000000)
-			return MODE_CLOCK_HIGH;
-
-	} else {
-		if (tmds_rate > 340000000)
-			return MODE_CLOCK_HIGH;
-	}
+	if (tmds_rate > lt9611c->max_tmds_rate)
+		return MODE_CLOCK_HIGH;
 
 	if (tmds_rate < 25000000)
 		return MODE_CLOCK_LOW;
@@ -618,12 +630,17 @@ static void lt9611c_video_setup(struct lt9611c *lt9611c,
 	int ret;
 	u32 h_total, hactive, hsync_len, hfront_porch, hback_porch;
 	u32 v_total, vactive, vsync_len, vfront_porch, vback_porch;
-	u8 timing_set_cmd[26] = {0x57, 0x4d, 0x33, 0x3a};
-	u8 return_param[3];
+	u8 timing_data[22];
+	struct lt9611c_rsp rsp = {};
 	u8 framerate;
 	u8 vic = 0x00;
+	struct lt9611c_cmd cmd = {
+		.hdr = { LT9611C_FUNC_WRITE, LT9611C_TYPE_MIPI, 0x33, LT9611C_CMD_SEP },
+		.data = timing_data,
+		.data_len = ARRAY_SIZE(timing_data),
+	};
 
-	guard(mutex)(&lt9611c->ocm_lock);
+	guard(mutex)(&lt9611c->mcu_lock);
 	h_total = mode->htotal;
 	hactive = mode->hdisplay;
 	hsync_len = mode->hsync_end - mode->hsync_start;
@@ -642,60 +659,26 @@ static void lt9611c_video_setup(struct lt9611c *lt9611c,
 	dev_dbg(dev, "framerate=%d\n", framerate);
 	dev_dbg(dev, "vic = 0x%02x\n", vic);
 
-	timing_set_cmd[4] = (h_total >> 8) & 0xff;
-	timing_set_cmd[5] = h_total & 0xff;
-	timing_set_cmd[6] = (hactive >> 8) & 0xff;
-	timing_set_cmd[7] = hactive & 0xff;
-	timing_set_cmd[8] = (hfront_porch >> 8) & 0xff;
-	timing_set_cmd[9] = hfront_porch & 0xff;
-	timing_set_cmd[10] = (hsync_len >> 8) & 0xff;
-	timing_set_cmd[11] = hsync_len & 0xff;
-	timing_set_cmd[12] = (hback_porch >> 8) & 0xff;
-	timing_set_cmd[13] = hback_porch & 0xff;
-	timing_set_cmd[14] = (v_total >> 8) & 0xff;
-	timing_set_cmd[15] = v_total & 0xff;
-	timing_set_cmd[16] = (vactive >> 8) & 0xff;
-	timing_set_cmd[17] = vactive & 0xFF;
-	timing_set_cmd[18] = (vfront_porch >> 8) & 0xff;
-	timing_set_cmd[19] = vfront_porch & 0xff;
-	timing_set_cmd[20] = (vsync_len >> 8) & 0xff;
-	timing_set_cmd[21] = vsync_len & 0xff;
-	timing_set_cmd[22] = (vback_porch >> 8) & 0xff;
-	timing_set_cmd[23] = vback_porch & 0xff;
-	timing_set_cmd[24] = framerate;
-	timing_set_cmd[25] = vic;
+	put_unaligned_be16(h_total,       &timing_data[0]);
+	put_unaligned_be16(hactive,       &timing_data[2]);
+	put_unaligned_be16(hfront_porch,  &timing_data[4]);
+	put_unaligned_be16(hsync_len,     &timing_data[6]);
+	put_unaligned_be16(hback_porch,   &timing_data[8]);
+	put_unaligned_be16(v_total,       &timing_data[10]);
+	put_unaligned_be16(vactive,       &timing_data[12]);
+	put_unaligned_be16(vfront_porch,  &timing_data[14]);
+	put_unaligned_be16(vsync_len,     &timing_data[16]);
+	put_unaligned_be16(vback_porch,   &timing_data[18]);
+	timing_data[20] = framerate;
+	timing_data[21] = vic;
 
-	ret = lt9611c_read_write_flow(lt9611c,
-				      timing_set_cmd, ARRAY_SIZE(timing_set_cmd),
-				      return_param, ARRAY_SIZE(return_param));
+	ret = lt9611c_read_write_flow(lt9611c, &cmd, &rsp);
 	if (ret)
 		dev_err(dev, "video set failed\n");
 }
 
-static void lt9611c_bridge_atomic_pre_enable(struct drm_bridge *bridge,
-					     struct drm_atomic_state *state)
-{
-	struct lt9611c *lt9611c = bridge_to_lt9611c(bridge);
-	int ret;
-
-	if (lt9611c->hdmi_gpio) {
-		gpiod_set_value_cansleep(lt9611c->hdmi_gpio, 1);
-		msleep(20);
-	}
-//	lt9611c_reset(lt9611c);
-
-	/* Reapply port selection after reset */
-	if (lt9611c->selected_port >= 0) {
-		msleep(200);
-		ret = lt9611c_select_port(lt9611c, lt9611c->selected_port);
-		if (ret < 0)
-			dev_err(lt9611c->dev, "failed to reapply port selection: %d\n", ret);
-		msleep(200);
-	}
-}
-
 static void lt9611c_bridge_atomic_enable(struct drm_bridge *bridge,
-					 struct drm_atomic_state *state)
+					 struct drm_atomic_commit *state)
 {
 	struct lt9611c *lt9611c = bridge_to_lt9611c(bridge);
 	struct drm_connector *connector;
@@ -720,18 +703,6 @@ static void lt9611c_bridge_atomic_enable(struct drm_bridge *bridge,
 	lt9611c_video_setup(lt9611c, mode);
 }
 
-static void lt9611c_bridge_atomic_post_disable(struct drm_bridge *bridge,
-					       struct drm_atomic_state *state)
-{
-	struct lt9611c *lt9611c = bridge_to_lt9611c(bridge);
-
-	/* Keep chip active for HPD detection */
-	mutex_lock(&lt9611c->ocm_lock);
-	regmap_write(lt9611c->regmap, 0xe0ee, 0x00);
-	regmap_write(lt9611c->regmap, 0xe0d0, 0x01);
-	mutex_unlock(&lt9611c->ocm_lock);
-}
-
 static enum drm_connector_status
 lt9611c_bridge_detect(struct drm_bridge *bridge, struct drm_connector *connector)
 {
@@ -739,23 +710,24 @@ lt9611c_bridge_detect(struct drm_bridge *bridge, struct drm_connector *connector
 	struct device *dev = lt9611c->dev;
 	int ret;
 	bool connected = false;
-	u8 cmd[5] = {0x52, 0x48, 0x31, 0x3a, 0x00};
-	u8 data[5];
+	static const u8 hpd_data[] = { 0x00 };
+	struct lt9611c_cmd cmd = {
+		.hdr = { LT9611C_FUNC_READ, LT9611C_TYPE_HDMI, 0x31, LT9611C_CMD_SEP },
+		.data = hpd_data,
+		.data_len = 1,
+	};
+	u8 hpd_status;
+	struct lt9611c_rsp rsp = { .data = &hpd_status, .data_len = 1 };
 
-	mutex_lock(&lt9611c->ocm_lock);
+	guard(mutex)(&lt9611c->mcu_lock);
 
-	/* Ensure MCU is running for HPD status query */
-	regmap_write(lt9611c->regmap, 0xe0ee, 0x00);
-
-	ret = lt9611c_read_write_flow(lt9611c, cmd, ARRAY_SIZE(cmd), data, ARRAY_SIZE(data));
+	ret = lt9611c_read_write_flow(lt9611c, &cmd, &rsp);
 	if (ret)
 		dev_err(dev, "failed to read HPD status (err=%d)\n", ret);
 	else
-		connected = (data[4] == 0x02);
+		connected = (hpd_status == 0x02);
 
 	lt9611c->hdmi_connected = connected;
-
-	mutex_unlock(&lt9611c->ocm_lock);
 
 	return connected ? connector_status_connected :
 				connector_status_disconnected;
@@ -766,25 +738,33 @@ static int lt9611c_get_edid_block(void *data, u8 *buf,
 {
 	struct lt9611c *lt9611c = data;
 	struct device *dev = lt9611c->dev;
-	u8 cmd[5] = {0x52, 0x48, 0x33, 0x3a, 0x00};
-	u8 packet[37];
+	u8 edid_raw[LT9611C_CMD_Y0_SIZE + LT9611C_EDID_BUF_SIZE];
+	u8 y0;
 	int ret, i, offset = 0;
+	struct lt9611c_cmd cmd = {
+		.hdr = { LT9611C_FUNC_READ, LT9611C_TYPE_HDMI, 0x33, LT9611C_CMD_SEP },
+	};
+	struct lt9611c_rsp rsp = {
+		.data = edid_raw,
+		.data_len = LT9611C_CMD_Y0_SIZE + LT9611C_EDID_BUF_SIZE,
+	};
 
 	if (len != 128)
 		return -EINVAL;
-	guard(mutex)(&lt9611c->ocm_lock);
+	guard(mutex)(&lt9611c->mcu_lock);
 
 	for (i = 0; i < 4; i++) {
-		cmd[4] = block * 4 + i;
-		ret = lt9611c_read_write_flow(lt9611c, cmd, ARRAY_SIZE(cmd),
-					      packet, ARRAY_SIZE(packet));
+		y0 = block * 4 + i;
+		cmd.data = &y0;
+		cmd.data_len = 1;
+		ret = lt9611c_read_write_flow(lt9611c, &cmd, &rsp);
 		if (ret) {
 			dev_err(dev, "Failed to read EDID block %u packet %d\n",
 				block, i);
 			return ret;
 		}
-		memcpy(buf + offset, &packet[5], 32);
-		offset += 32;
+		memcpy(buf + offset, &edid_raw[LT9611C_CMD_Y0_SIZE], LT9611C_EDID_BUF_SIZE);
+		offset += LT9611C_EDID_BUF_SIZE;
 	}
 
 	return 0;
@@ -798,164 +778,74 @@ static const struct drm_edid *lt9611c_bridge_edid_read(struct drm_bridge *bridge
 	return drm_edid_read_custom(connector, lt9611c_get_edid_block, lt9611c);
 }
 
+static int lt9611c_write_infoframe(struct lt9611c *lt9611c, u8 type,
+				   const u8 *buffer, size_t len)
+{
+	u8 extra[1 + LT9611C_INFOFRAME_MAX_SIZE];
+	struct lt9611c_rsp rsp = {};
+	struct lt9611c_cmd cmd = {
+		.hdr = { LT9611C_FUNC_WRITE, LT9611C_TYPE_HDMI, 0x35, LT9611C_CMD_SEP },
+	};
+
+	if (WARN_ON(len > LT9611C_INFOFRAME_MAX_SIZE))
+		return -EINVAL;
+
+	extra[0] = type;
+	memcpy(&extra[1], buffer, len);
+	cmd.data = extra;
+	cmd.data_len = 1 + len;
+
+	guard(mutex)(&lt9611c->mcu_lock);
+
+	return lt9611c_read_write_flow(lt9611c, &cmd, &rsp);
+}
+
+static int lt9611c_clear_infoframe(struct lt9611c *lt9611c, u8 type)
+{
+	u8 clear_data = type;
+	struct lt9611c_cmd cmd = {
+		.hdr = { LT9611C_FUNC_WRITE, LT9611C_TYPE_HDMI, 0x42, LT9611C_CMD_SEP },
+		.data = &clear_data,
+		.data_len = 1,
+	};
+	struct lt9611c_rsp rsp = {};
+
+	guard(mutex)(&lt9611c->mcu_lock);
+
+	return lt9611c_read_write_flow(lt9611c, &cmd, &rsp);
+}
+
 static int lt9611c_hdmi_write_avi_infoframe(struct drm_bridge *bridge,
 					    const u8 *buffer, size_t len)
 {
-	struct lt9611c *lt9611c = bridge_to_lt9611c(bridge);
-	u8 *cmd;
-	u8 data[5];
-	int ret;
-
-	guard(mutex)(&lt9611c->ocm_lock);
-
-	cmd = kmalloc(5 + len, GFP_KERNEL);
-	if (!cmd)
-		return -ENOMEM;
-
-	cmd[0] = 0x57;
-	cmd[1] = 0x48;
-	cmd[2] = 0x35;
-	cmd[3] = 0x3a;
-	cmd[4] = 0x01;/*write avi*/
-	memcpy(cmd + 5, buffer, len);
-
-	ret = lt9611c_read_write_flow(lt9611c, cmd, 5 + len,
-				      data, ARRAY_SIZE(data));
-	kfree(cmd);
-
-	if (ret < 0) {
-		dev_err(lt9611c->dev, "write avi infoframe failed!\n");
-		return ret;
-	}
-
-	return 0;
+	return lt9611c_write_infoframe(bridge_to_lt9611c(bridge), 0x01, buffer, len);
 }
 
 static int lt9611c_hdmi_clear_avi_infoframe(struct drm_bridge *bridge)
 {
-	struct lt9611c *lt9611c = bridge_to_lt9611c(bridge);
-	u8 cmd[5] = {0x57, 0x48, 0x42, 0x3a, 0x01};
-	u8 data[5];
-	int ret;
-
-	guard(mutex)(&lt9611c->ocm_lock);
-
-	ret = lt9611c_read_write_flow(lt9611c, cmd, ARRAY_SIZE(cmd),
-				      data, ARRAY_SIZE(data));
-
-	if (ret < 0) {
-		dev_err(lt9611c->dev, "clear avi infoframe failed!\n");
-		return ret;
-	}
-
-	return 0;
+	return lt9611c_clear_infoframe(bridge_to_lt9611c(bridge), 0x01);
 }
 
 static int lt9611c_hdmi_write_hdmi_infoframe(struct drm_bridge *bridge,
 					     const u8 *buffer, size_t len)
 {
-	struct lt9611c *lt9611c = bridge_to_lt9611c(bridge);
-	u8 *cmd;
-	u8 data[5];
-	int ret;
-
-	guard(mutex)(&lt9611c->ocm_lock);
-
-	cmd = kmalloc(5 + len, GFP_KERNEL);
-	if (!cmd)
-		return -ENOMEM;
-
-	cmd[0] = 0x57;
-	cmd[1] = 0x48;
-	cmd[2] = 0x35;
-	cmd[3] = 0x3a;
-	cmd[4] = 0x03;/*write hdmi infoframe*/
-	memcpy(cmd + 5, buffer, len);
-
-	ret = lt9611c_read_write_flow(lt9611c, cmd, 5 + len,
-				      data, ARRAY_SIZE(data));
-	kfree(cmd);
-
-	if (ret < 0) {
-		dev_err(lt9611c->dev, "write hdmi infoframe failed!\n");
-		return ret;
-	}
-
-	return 0;
+	return lt9611c_write_infoframe(bridge_to_lt9611c(bridge), 0x04, buffer, len);
 }
 
 static int lt9611c_hdmi_clear_hdmi_infoframe(struct drm_bridge *bridge)
 {
-	struct lt9611c *lt9611c = bridge_to_lt9611c(bridge);
-	u8 cmd[5] = {0x57, 0x48, 0x42, 0x3a, 0x03};
-	u8 data[5];
-	int ret;
-
-	guard(mutex)(&lt9611c->ocm_lock);
-
-	ret = lt9611c_read_write_flow(lt9611c, cmd, ARRAY_SIZE(cmd),
-				      data, ARRAY_SIZE(data));
-
-	if (ret < 0) {
-		dev_err(lt9611c->dev, "clear hdmi infoframe failed!\n");
-		return ret;
-	}
-
-	return 0;
+	return lt9611c_clear_infoframe(bridge_to_lt9611c(bridge), 0x04);
 }
 
 static int lt9611c_hdmi_write_audio_infoframe(struct drm_bridge *bridge,
 					      const u8 *buffer, size_t len)
 {
-	struct lt9611c *lt9611c = bridge_to_lt9611c(bridge);
-	u8 *cmd;
-	u8 data[5];
-	int ret;
-
-	guard(mutex)(&lt9611c->ocm_lock);
-
-	cmd = kmalloc(5 + len, GFP_KERNEL);
-	if (!cmd)
-		return -ENOMEM;
-
-	cmd[0] = 0x57;
-	cmd[1] = 0x48;
-	cmd[2] = 0x35;
-	cmd[3] = 0x3a;
-	cmd[4] = 0x02;/*write audio*/
-	memcpy(cmd + 5, buffer, len);
-
-	ret = lt9611c_read_write_flow(lt9611c, cmd, 5 + len,
-				      data, ARRAY_SIZE(data));
-
-	kfree(cmd);
-
-	if (ret < 0) {
-		dev_err(lt9611c->dev, "write audio infoframe failed!\n");
-		return ret;
-	}
-
-	return 0;
+	return lt9611c_write_infoframe(bridge_to_lt9611c(bridge), 0x02, buffer, len);
 }
 
 static int lt9611c_hdmi_clear_audio_infoframe(struct drm_bridge *bridge)
 {
-	struct lt9611c *lt9611c = bridge_to_lt9611c(bridge);
-	u8 cmd[5] = {0x57, 0x48, 0x42, 0x3a, 0x02};
-	u8 data[5];
-	int ret;
-
-	guard(mutex)(&lt9611c->ocm_lock);
-
-	ret = lt9611c_read_write_flow(lt9611c, cmd, ARRAY_SIZE(cmd),
-				      data, ARRAY_SIZE(data));
-
-	if (ret < 0) {
-		dev_err(lt9611c->dev, "clear audio infoframe failed!\n");
-		return ret;
-	}
-
-	return 0;
+	return lt9611c_clear_infoframe(bridge_to_lt9611c(bridge), 0x02);
 }
 
 static int lt9611c_hdmi_audio_prepare(struct drm_bridge *bridge,
@@ -964,32 +854,36 @@ static int lt9611c_hdmi_audio_prepare(struct drm_bridge *bridge,
 				      struct hdmi_codec_params *hparms)
 {
 	struct lt9611c *lt9611c = bridge_to_lt9611c(bridge);
-	u8 audio_cmd[6] = {0x57, 0x48, 0x36, 0x3a};
-	u8 data[5];
+	u8 audio_extra[2];
+	struct lt9611c_rsp rsp = {};
 	int ret;
+	struct lt9611c_cmd cmd = {
+		.hdr = { LT9611C_FUNC_WRITE, LT9611C_TYPE_HDMI, 0x36, LT9611C_CMD_SEP },
+				   .data = audio_extra,
+				   .data_len = ARRAY_SIZE(audio_extra) };
 
 	if (hparms->sample_width == 32)
 		return -EINVAL;
 
 	switch (fmt->fmt) {
 	case HDMI_I2S:
-		audio_cmd[4] = 0x01;
+		audio_extra[0] = 0x01;
 		break;
 	case HDMI_SPDIF:
-		audio_cmd[4] = 0x02;
+		audio_extra[0] = 0x02;
 		break;
 	default:
 		return -EINVAL;
 	}
 
-	audio_cmd[5] = hparms->channels;
-	guard(mutex)(&lt9611c->ocm_lock);
+	audio_extra[1] = hparms->channels;
 
-	ret = lt9611c_read_write_flow(lt9611c, audio_cmd, sizeof(audio_cmd),
-				      data, sizeof(data));
-	if (ret < 0) {
-		dev_err(lt9611c->dev, "set audio info failed!\n");
-		return ret;
+	scoped_guard(mutex, &lt9611c->mcu_lock) {
+		ret = lt9611c_read_write_flow(lt9611c, &cmd, &rsp);
+		if (ret < 0) {
+			dev_err(lt9611c->dev, "set audio info failed!\n");
+			return ret;
+		}
 	}
 
 	return drm_atomic_helper_connector_hdmi_update_audio_infoframe(connector,
@@ -1002,22 +896,14 @@ static void lt9611c_hdmi_audio_shutdown(struct drm_bridge *bridge,
 	drm_atomic_helper_connector_hdmi_clear_audio_infoframe(connector);
 }
 
-static int lt9611c_hdmi_audio_startup(struct drm_bridge *bridge,
-				      struct drm_connector *connector)
-{
-	return 0;
-}
-
 static const struct drm_bridge_funcs lt9611c_bridge_funcs = {
 	.attach = lt9611c_bridge_attach,
 	.detect = lt9611c_bridge_detect,
 	.edid_read = lt9611c_bridge_edid_read,
-	.atomic_pre_enable = lt9611c_bridge_atomic_pre_enable,
 	.atomic_enable = lt9611c_bridge_atomic_enable,
-	.atomic_post_disable = lt9611c_bridge_atomic_post_disable,
 	.atomic_duplicate_state = drm_atomic_helper_bridge_duplicate_state,
 	.atomic_destroy_state = drm_atomic_helper_bridge_destroy_state,
-	.atomic_reset = drm_atomic_helper_bridge_reset,
+	.atomic_create_state = drm_atomic_helper_bridge_create_state,
 
 	.hdmi_tmds_char_rate_valid = lt9611c_hdmi_tmds_char_rate_valid,
 	.hdmi_write_avi_infoframe = lt9611c_hdmi_write_avi_infoframe,
@@ -1027,7 +913,6 @@ static const struct drm_bridge_funcs lt9611c_bridge_funcs = {
 	.hdmi_write_audio_infoframe = lt9611c_hdmi_write_audio_infoframe,
 	.hdmi_clear_audio_infoframe = lt9611c_hdmi_clear_audio_infoframe,
 
-	.hdmi_audio_startup = lt9611c_hdmi_audio_startup,
 	.hdmi_audio_prepare = lt9611c_hdmi_audio_prepare,
 	.hdmi_audio_shutdown = lt9611c_hdmi_audio_shutdown,
 };
@@ -1035,30 +920,32 @@ static const struct drm_bridge_funcs lt9611c_bridge_funcs = {
 static int lt9611c_parse_dt(struct device *dev,
 			    struct lt9611c *lt9611c)
 {
+	int ret;
+
 	lt9611c->dsi0_node = of_graph_get_remote_node(dev->of_node, 0, -1);
 	if (!lt9611c->dsi0_node)
 		return dev_err_probe(dev, -ENODEV, "failed to get remote node for primary dsi\n");
 
 	lt9611c->dsi1_node = of_graph_get_remote_node(dev->of_node, 1, -1);
 
-	return drm_of_find_panel_or_bridge(dev->of_node, 2, -1, NULL, &lt9611c->bridge.next_bridge);
-}
+	if (lt9611c->dsi1_node && lt9611c->chip_type == CHIP_LT9611C) {
+		ret = dev_err_probe(dev, -EINVAL,
+				    "LT9611C does not support dual DSI\n");
+		goto err_put_dsi1;
+	}
 
-static int lt9611c_gpio_init(struct lt9611c *lt9611c)
-{
-	struct device *dev = lt9611c->dev;
-
-	lt9611c->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
-	if (IS_ERR(lt9611c->reset_gpio))
-		return dev_err_probe(dev, PTR_ERR(lt9611c->reset_gpio),
-				"failed to acquire reset gpio\n");
-
-	lt9611c->hdmi_gpio = devm_gpiod_get_optional(dev, "hdmi", GPIOD_OUT_LOW);
-	if (IS_ERR(lt9611c->hdmi_gpio))
-		return dev_err_probe(dev, PTR_ERR(lt9611c->hdmi_gpio),
-				"failed to acquire hdmi gpio\n");
+	lt9611c->bridge.next_bridge = of_drm_get_bridge_by_endpoint(dev->of_node, 2, -1);
+	if (IS_ERR(lt9611c->bridge.next_bridge)) {
+		ret = PTR_ERR(lt9611c->bridge.next_bridge);
+		goto err_put_dsi1;
+	}
 
 	return 0;
+
+err_put_dsi1:
+	of_node_put(lt9611c->dsi1_node);
+	of_node_put(lt9611c->dsi0_node);
+	return ret;
 }
 
 static int lt9611c_read_version(struct lt9611c *lt9611c)
@@ -1099,34 +986,44 @@ static int lt9611c_read_chipid(struct lt9611c *lt9611c)
 	return 0;
 }
 
-static ssize_t lt9611c_firmware_store(struct device *dev, struct device_attribute *attr,
+static ssize_t firmware_store(struct device *dev, struct device_attribute *attr,
 				      const char *buf, size_t len)
 {
 	struct lt9611c *lt9611c = dev_get_drvdata(dev);
 	int ret;
 
-	lt9611c_lock(lt9611c);
+	dev_warn(dev, "starting firmware upgrade — display will be disrupted\n");
 
 	ret = lt9611c_firmware_upgrade(lt9611c);
-	if (ret < 0)
+	if (ret < 0) {
 		dev_err(dev, "upgrade failure\n");
+		return ret;
+	}
 
+	lt9611c_lock(lt9611c);
+	lt9611c->fw_version = lt9611c_read_version(lt9611c);
 	lt9611c_unlock(lt9611c);
 
-	return ret < 0 ? ret : len;
+	if (lt9611c->fw_version < 0)
+		dev_warn(dev, "upgrade succeeded but failed to read new fw version\n");
+	else
+		dev_info(dev, "firmware upgrade succeeded, version: 0x%04x\n",
+			 lt9611c->fw_version);
+
+	return len;
 }
 
-static ssize_t lt9611c_firmware_show(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t firmware_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct lt9611c *lt9611c = dev_get_drvdata(dev);
 
 	return sysfs_emit(buf, "0x%04x\n", lt9611c->fw_version);
 }
 
-static DEVICE_ATTR_RW(lt9611c_firmware);
+static DEVICE_ATTR_RW(firmware);
 
 static struct attribute *lt9611c_attrs[] = {
-	&dev_attr_lt9611c_firmware.attr,
+	&dev_attr_firmware.attr,
 	NULL,
 };
 
@@ -1157,8 +1054,16 @@ static int lt9611c_probe(struct i2c_client *client)
 
 	lt9611c->dev = dev;
 	lt9611c->client = client;
-	lt9611c->chip_type = (enum lt9611_chip_type)(uintptr_t)of_device_get_match_data(dev);
-	ret = devm_mutex_init(dev, &lt9611c->ocm_lock);
+
+	const struct lt9611c_chip_data *cdata = i2c_get_match_data(client);
+
+	if (!cdata)
+		return dev_err_probe(dev, -EINVAL, "no match data for device\n");
+
+	lt9611c->chip_type = cdata->chip_type;
+	lt9611c->max_tmds_rate = cdata->max_tmds_rate;
+
+	ret = devm_mutex_init(dev, &lt9611c->mcu_lock);
 	if (ret)
 		return dev_err_probe(dev, ret, "failed to init mutex\n");
 
@@ -1170,17 +1075,21 @@ static int lt9611c_probe(struct i2c_client *client)
 	if (ret)
 		return dev_err_probe(dev, ret, "failed to parse device tree\n");
 
-	ret = lt9611c_gpio_init(lt9611c);
+	lt9611c->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(lt9611c->reset_gpio)) {
+		ret = PTR_ERR(lt9611c->reset_gpio);
+		goto err_of_put;
+	}
+
+	ret = lt9611c_regulator_init(lt9611c);
 	if (ret < 0)
 		goto err_of_put;
 
-	if (lt9611c->hdmi_gpio) {
-		gpiod_set_value_cansleep(lt9611c->hdmi_gpio, 1);
-		msleep(20);
-	}
+	ret = regulator_bulk_enable(ARRAY_SIZE(lt9611c->supplies), lt9611c->supplies);
+	if (ret)
+		goto err_of_put;
 
 	lt9611c_reset(lt9611c);
-	msleep(300);
 
 	lt9611c_lock(lt9611c);
 
@@ -1202,11 +1111,11 @@ retry:
 	} else if (lt9611c->fw_version == 0) {
 		if (!fw_updated) {
 			fw_updated = true;
+			lt9611c_unlock(lt9611c);
 			ret = lt9611c_firmware_upgrade(lt9611c);
-			if (ret < 0) {
-				lt9611c_unlock(lt9611c);
+			if (ret < 0)
 				goto err_disable_regulators;
-			}
+			lt9611c_lock(lt9611c);
 			goto retry;
 
 		} else {
@@ -1218,25 +1127,13 @@ retry:
 	}
 
 	lt9611c_unlock(lt9611c);
-
-	/* Select port B so the chip is configured for the correct DSI input */
-	msleep(200);
-	ret = lt9611c_select_port(lt9611c, PORT_SWAP_B);
-	if (ret < 0) {
-		dev_warn(dev, "port B selection failed (%d), HPD may not work\n", ret);
-		lt9611c->selected_port = -1;
-	} else {
-		lt9611c->selected_port = PORT_SWAP_B;
-	}
-	msleep(200);
-
 	dev_dbg(dev, "current version:0x%04x", lt9611c->fw_version);
 
 	INIT_WORK(&lt9611c->work, lt9611c_hpd_work);
 
 	ret = devm_request_threaded_irq(&client->dev, client->irq, NULL,
 					lt9611c_irq_thread_handler,
-					IRQF_TRIGGER_RISING |
+					IRQF_TRIGGER_FALLING |
 					IRQF_ONESHOT |
 					IRQF_NO_AUTOEN,
 					"lt9611c", lt9611c);
@@ -1254,24 +1151,13 @@ retry:
 	lt9611c->bridge.type = DRM_MODE_CONNECTOR_HDMIA;
 
 	lt9611c->bridge.vendor = "Lontium";
-	switch (lt9611c->chip_type) {
-	case CHIP_LT9611C:
-		lt9611c->bridge.product = "LT9611C";
-		break;
-	case CHIP_LT9611EX:
-		lt9611c->bridge.product = "LT9611EX";
-		break;
-	case CHIP_LT9611UXD:
-	default:
-		lt9611c->bridge.product = "LT9611UXD";
-		break;
-	}
+	lt9611c->bridge.product = "LT9611C";
 
 	lt9611c->bridge.hdmi_audio_dev = dev;
 	lt9611c->bridge.hdmi_audio_max_i2s_playback_channels = 8;
 	lt9611c->bridge.hdmi_audio_dai_port = 2;
 
-	devm_drm_bridge_add(dev, &lt9611c->bridge);
+	drm_bridge_add(&lt9611c->bridge);
 
 	/* Attach primary DSI */
 	lt9611c->dsi0 = lt9611c_attach_dsi(lt9611c, lt9611c->dsi0_node);
@@ -1291,33 +1177,17 @@ retry:
 
 	lt9611c->hdmi_connected = false;
 	i2c_set_clientdata(client, lt9611c);
-
-	/* Enable HPD interrupt in the chip */
-	{
-		unsigned int irq_status;
-
-		mutex_lock(&lt9611c->ocm_lock);
-		regmap_write(lt9611c->regmap, 0xe0ee, 0x01);
-		regmap_read(lt9611c->regmap, 0xe084, &irq_status);
-		if (irq_status) {
-			regmap_write(lt9611c->regmap, 0xe0df, irq_status);
-			msleep(20);
-			regmap_write(lt9611c->regmap, 0xe0df, 0x00);
-		}
-		regmap_write(lt9611c->regmap, 0xe0d0, 0x01);
-		regmap_write(lt9611c->regmap, 0xe0ee, 0x00);
-		mutex_unlock(&lt9611c->ocm_lock);
-	}
-
 	enable_irq(client->irq);
-	msleep(100);
 
 	return 0;
 
 err_remove_bridge:
+	drm_bridge_remove(&lt9611c->bridge);
 	cancel_work_sync(&lt9611c->work);
 
 err_disable_regulators:
+	regulator_bulk_disable(ARRAY_SIZE(lt9611c->supplies), lt9611c->supplies);
+
 err_of_put:
 	of_node_put(lt9611c->dsi1_node);
 	of_node_put(lt9611c->dsi0_node);
@@ -1329,11 +1199,10 @@ static void lt9611c_remove(struct i2c_client *client)
 {
 	struct lt9611c *lt9611c = i2c_get_clientdata(client);
 
-	/*
-	 * IRQ was requested with devm_request_threaded_irq and is freed
-	 * automatically by devres — do NOT call free_irq() here.
-	 */
+	disable_irq(client->irq);
 	cancel_work_sync(&lt9611c->work);
+	drm_bridge_remove(&lt9611c->bridge);
+	regulator_bulk_disable(ARRAY_SIZE(lt9611c->supplies), lt9611c->supplies);
 	of_node_put(lt9611c->dsi1_node);
 	of_node_put(lt9611c->dsi0_node);
 }
@@ -1341,12 +1210,20 @@ static void lt9611c_remove(struct i2c_client *client)
 static int lt9611c_bridge_suspend(struct device *dev)
 {
 	struct lt9611c *lt9611c = dev_get_drvdata(dev);
+	int ret;
 
-	dev_dbg(lt9611c->dev, "suspend\n");
 	disable_irq(lt9611c->client->irq);
-	gpiod_set_value_cansleep(lt9611c->reset_gpio, 0);
-	if (lt9611c->hdmi_gpio)
-		gpiod_set_value_cansleep(lt9611c->hdmi_gpio, 0);
+	cancel_work_sync(&lt9611c->work);
+
+	gpiod_set_value_cansleep(lt9611c->reset_gpio, 1);
+
+	ret = regulator_bulk_disable(ARRAY_SIZE(lt9611c->supplies), lt9611c->supplies);
+	if (ret) {
+		dev_err(lt9611c->dev, "regulator bulk disable failed.\n");
+		gpiod_set_value_cansleep(lt9611c->reset_gpio, 0);
+		enable_irq(lt9611c->client->irq);
+		return ret;
+	}
 
 	return 0;
 }
@@ -1356,25 +1233,15 @@ static int lt9611c_bridge_resume(struct device *dev)
 	struct lt9611c *lt9611c = dev_get_drvdata(dev);
 	int ret;
 
-	if (lt9611c->hdmi_gpio) {
-		gpiod_set_value_cansleep(lt9611c->hdmi_gpio, 1);
-		msleep(20);
+	ret = regulator_bulk_enable(ARRAY_SIZE(lt9611c->supplies), lt9611c->supplies);
+	if (ret) {
+		dev_err(lt9611c->dev, "regulator bulk enable failed.\n");
+		return ret;
 	}
 	lt9611c_reset(lt9611c);
-
-	/* Reapply port selection after reset, same as atomic_pre_enable */
-	if (lt9611c->selected_port >= 0) {
-		msleep(200);
-		ret = lt9611c_select_port(lt9611c, lt9611c->selected_port);
-		if (ret < 0)
-			dev_warn(lt9611c->dev, "resume: failed to reapply port selection, ret=%d\n", ret);
-		msleep(200);
-	}
-
 	enable_irq(lt9611c->client->irq);
-	dev_dbg(lt9611c->dev, "resume\n");
 
-	return 0;
+	return ret;
 }
 
 static const struct dev_pm_ops lt9611c_bridge_pm_ops = {
@@ -1383,17 +1250,16 @@ static const struct dev_pm_ops lt9611c_bridge_pm_ops = {
 };
 
 static struct i2c_device_id lt9611c_id[] = {
-	/* chip_type */
-	{ "lontium,lt9611c", 0 },
-	{ "lontium,lt9611ex", 1 },
-	{ "lontium,lt9611uxd", 2 },
+	{ "lontium,lt9611c",   (kernel_ulong_t)&lt9611c_chip_data[CHIP_LT9611C]   },
+	{ "lontium,lt9611ex",  (kernel_ulong_t)&lt9611c_chip_data[CHIP_LT9611EX]  },
+	{ "lontium,lt9611uxd", (kernel_ulong_t)&lt9611c_chip_data[CHIP_LT9611UXD] },
 	{ /* sentinel */ }
 };
 
 static const struct of_device_id lt9611c_match_table[] = {
-	{ .compatible = "lontium,lt9611c",   .data = (void *)CHIP_LT9611C },
-	{ .compatible = "lontium,lt9611ex",  .data = (void *)CHIP_LT9611EX },
-	{ .compatible = "lontium,lt9611uxd", .data = (void *)CHIP_LT9611UXD },
+	{ .compatible = "lontium,lt9611c",   .data = &lt9611c_chip_data[CHIP_LT9611C]   },
+	{ .compatible = "lontium,lt9611ex",  .data = &lt9611c_chip_data[CHIP_LT9611EX]  },
+	{ .compatible = "lontium,lt9611uxd", .data = &lt9611c_chip_data[CHIP_LT9611UXD] },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, lt9611c_match_table);
