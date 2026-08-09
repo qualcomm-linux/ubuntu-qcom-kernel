@@ -97,6 +97,7 @@ struct qmi_elem_info {
  * @result:	result of the transaction
  * @error:	error value, when @result is QMI_RESULT_FAILURE_V01
  */
+#define QMI_SERVICE_ID_TMD		0x18	/*   24 */
 struct qmi_response_type_v01 {
 	u16 result;
 	u16 error;
