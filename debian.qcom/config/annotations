@@ -632,7 +632,7 @@ CONFIG_COMPACT_UNEVICTABLE_DEFAULT              policy<{'arm64': '1', 'arm64-qco
 CONFIG_CORESIGHT                                policy<{'arm64': 'm'}>
 CONFIG_CORESIGHT_CATU                           policy<{'arm64-qcom': 'n'}>
 CONFIG_CORESIGHT_CPU_DEBUG                      policy<{'arm64': 'n'}>
-CONFIG_CORESIGHT_CTCU                           policy<{'arm64-qcom': 'n'}>
+CONFIG_CORESIGHT_CTCU                           policy<{'arm64-qcom': 'm'}>
 CONFIG_CORESIGHT_CTI                            policy<{'arm64': 'n', 'arm64-qcom': 'm'}>
 CONFIG_CORESIGHT_CTI_INTEGRATION_REGS           policy<{'arm64-qcom': 'n'}>
 CONFIG_CORESIGHT_DUMMY                          policy<{'arm64': 'm'}>
