@@ -2415,7 +2415,7 @@ CONFIG_STM32_RPROC                              policy<{'arm64': '-'}>
 CONFIG_STM32_TIMER_CNT                          policy<{'arm64': '-'}>
 CONFIG_STM32_WATCHDOG                           policy<{'arm64': '-'}>
 CONFIG_STMP_DEVICE                              policy<{'arm64': '-'}>
-CONFIG_STM_PROTO_OST                            policy<{'arm64': 'n'}>
+CONFIG_STM_PROTO_OST                            policy<{'arm64': 'm'}>
 CONFIG_STUB_CLK_HI3660                          policy<{'arm64': '-'}>
 CONFIG_STUB_CLK_HI6220                          policy<{'arm64': '-'}>
 CONFIG_ST_THERMAL                               policy<{'arm64': '-'}>
