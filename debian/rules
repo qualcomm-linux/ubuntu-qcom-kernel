@@ -46,6 +46,7 @@ do_linux_tools=$(sort $(filter-out false,$(do_tools_usbip) $(do_tools_cpupower) 
 do_cloud_tools=$(sort $(filter-out false,$(do_tools_hyperv)))
 do_tools_perf_jvmti?=false
 do_tools_perf_python?=false
+do_dkms_kgsl?=false
 
 # Indep tools packages may only be built for the main linux source package
 ifeq ($(DEB_SOURCE),linux)
@@ -71,6 +72,10 @@ endif
 $(foreach _m,$(all_dkms_modules), \
   $(eval do_$(_m) ?= $(if $(filter $(_m),$(filter-out $(dkms_exclude),$(dkms_include) $(subst any,$(_m),$(subst $(arch),$(_m),$(dkms_$(_m)_archs))))),true,false)) \
 )
+
+ifeq ($(do_dkms_kgsl),false)
+       do_kgsl_disable:=$(shell for m in $$(cat $(DROOT)/kgsl-modules.ignore); do grep -qxF $$m $(prev_abidir)/../modules.ignore 2>/dev/null || echo $$m >> $(prev_abidir)/../modules.ignore; done)
+endif
 
 # Are any of the kernel signing options enabled.
 any_signed=$(sort $(filter-out false,$(uefi_signed) $(opal_signed) $(sipl_signed)))

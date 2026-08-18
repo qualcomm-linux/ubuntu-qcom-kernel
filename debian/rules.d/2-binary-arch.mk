@@ -385,6 +385,7 @@ endif
 	  ) \
 	)
 
+	$(if $(filter true,$(do_dkms_kgsl)),$(call build_dkms, $(mods_pkg_name)-$*, $(pkgdir)/lib/modules/$(abi_release)-$*/kernel, "", kgsl, kgsl-dkms))
 
 ifeq ($(do_dbgsym_package),true)
 	# Add .gnu_debuglink sections to each stripped .ko
