@@ -178,6 +178,19 @@ endif
 	install -m600 $(build_dir)/System.map \
 		$(pkgdir)/boot/System.map-$(abi_release)-$*
 
+ifeq ($(do_dtbs_version),true)
+	# Stamp every built device tree with the build version, so the running
+	# system can report which build its device tree came from. This runs
+	# before dtbs_install and the FIT image generation so that both carry
+	# the stamp. Overlays are stamped too; an overlay's own root properties
+	# are ignored when it is applied, so this is harmless.
+	set -e; \
+	for dtb in $$(find $(build_dir)/arch/$(build_arch)/boot/dts \
+			\( -name '*.dtb' -o -name '*.dtbo' \) -print); do \
+		fdtput -t s "$$dtb" / '$(dtb_version_prop)' '$(dtb_version)'; \
+	done
+endif
+
 ifeq ($(do_dtbs),true)
 	# Force -j1: rust-coreutils' install(1) has an unfixed EEXIST race in
 	# `install -D` when parallel invocations share a parent directory,

@@ -17,4 +17,5 @@ do_tools_bpftool = true
 
 do_dtbs		= true
 do_fitimage	= true
+do_dtbs_version	= true
 do_dkms_kgsl     = true

@@ -151,6 +151,12 @@ do_dtbs=false
 # FIT image (bundle of DTBs) generation
 do_fitimage=false
 
+# Stamp every built DTB with a build version, readable on the running
+# system from /proc/device-tree/<dtb_version_prop>.
+do_dtbs_version=false
+dtb_version_prop=ubuntu,dtb-version
+dtb_version := $(DEB_SOURCE) $(DEB_VERSION)
+
 # ZSTD compressed kernel modules
 do_zstd_ko=true
 ifeq ($(DEB_DISTRIBUTION),jammy)
