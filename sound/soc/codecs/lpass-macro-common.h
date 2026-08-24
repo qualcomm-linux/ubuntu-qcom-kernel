@@ -35,6 +35,8 @@ enum lpass_codec_version {
 struct lpass_macro {
 	struct device *macro_pd;
 	struct device *dcodec_pd;
+	struct device_link *macro_link;
+	struct device_link *dcodec_link;
 };
 
 struct lpass_macro *lpass_macro_pds_init(struct device *dev);

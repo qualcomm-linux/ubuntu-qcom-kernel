@@ -2532,13 +2532,11 @@ static int wsa_swrm_clock(struct wsa_macro *wsa, bool enable)
 	struct regmap *regmap = wsa->regmap;
 	int ret;
 
-	ret = pm_runtime_get_sync(wsa->dev);
-	if (ret < 0) {
-		pm_runtime_put_noidle(wsa->dev);
-		return ret;
-	}
-
 	if (enable) {
+		ret = pm_runtime_resume_and_get(wsa->dev);
+		if (ret < 0)
+			return ret;
+
 		wsa_macro_mclk_enable(wsa, true);
 
 		regmap_update_bits(regmap, CDC_WSA_CLK_RST_CTRL_SWR_CONTROL,
@@ -2549,10 +2547,12 @@ static int wsa_swrm_clock(struct wsa_macro *wsa, bool enable)
 		regmap_update_bits(regmap, CDC_WSA_CLK_RST_CTRL_SWR_CONTROL,
 				   CDC_WSA_SWR_CLK_EN_MASK, 0);
 		wsa_macro_mclk_enable(wsa, false);
+
+		ret = pm_runtime_put_autosuspend(wsa->dev);
+		if (ret < 0)
+			dev_warn(wsa->dev, "runtime PM put failed: %d\n", ret);
 	}
 
-	pm_runtime_mark_last_busy(wsa->dev);
-	pm_runtime_put_autosuspend(wsa->dev);
 	return 0;
 }
 
@@ -2658,7 +2658,7 @@ static int wsa_macro_register_mclk_output(struct wsa_macro *wsa)
 	init.num_parents = 1;
 	wsa->hw.init = &init;
 	hw = &wsa->hw;
-	ret = clk_hw_register(wsa->dev, hw);
+	ret = devm_clk_hw_register(wsa->dev, hw);
 	if (ret)
 		return ret;
 
@@ -2773,9 +2773,15 @@ static int wsa_macro_probe(struct platform_device *pdev)
 	wsa->dev = dev;
 
 	/* set MCLK and NPL rates */
-	clk_set_rate(wsa->mclk, WSA_MACRO_MCLK_FREQ);
-	if (wsa->npl)
-		clk_set_rate(wsa->npl, WSA_MACRO_MCLK_FREQ);
+	ret = clk_set_rate(wsa->mclk, WSA_MACRO_MCLK_FREQ);
+	if (ret)
+		return ret;
+
+	if (wsa->npl) {
+		ret = clk_set_rate(wsa->npl, WSA_MACRO_MCLK_FREQ);
+		if (ret)
+			return ret;
+	}
 
 	ret = devm_pm_clk_create(dev);
 	if (ret)
@@ -2785,15 +2791,15 @@ static int wsa_macro_probe(struct platform_device *pdev)
 	if (ret < 0)
 		return ret;
 
-	pm_runtime_set_autosuspend_delay(dev, 3000);
+	pm_runtime_set_autosuspend_delay(dev, 100);
 	pm_runtime_use_autosuspend(dev);
-	pm_runtime_enable(dev);
-
+	ret = devm_pm_runtime_enable(dev);
+	if (ret)
+		return ret;
 
 	ret = pm_runtime_resume_and_get(dev);
-	if (ret < 0) {
-		goto err_rpm_disable;
-	}
+	if (ret < 0)
+		return ret;
 
 	/* reset swr ip */
 	regmap_update_bits(wsa->regmap, CDC_WSA_CLK_RST_CTRL_SWR_CONTROL,
@@ -2816,43 +2822,61 @@ static int wsa_macro_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_rpm_put;
 
-	pm_runtime_mark_last_busy(dev);
-	pm_runtime_put_autosuspend(dev);
+	ret = pm_runtime_put_autosuspend(dev);
+	if (ret < 0)
+		dev_warn(dev, "runtime PM put failed after probe: %d\n", ret);
 
 	return 0;
 err_rpm_put:
-	pm_runtime_put_noidle(dev);
-err_rpm_disable:
-	pm_runtime_disable(dev);
+	if (pm_runtime_put_sync_suspend(dev) < 0)
+		dev_warn(dev, "runtime PM sync suspend failed in probe unwind\n");
 	return ret;
-}
-
-static void wsa_macro_remove(struct platform_device *pdev)
-{
-	pm_runtime_disable(&pdev->dev);
 }
 
 static int wsa_macro_runtime_suspend(struct device *dev)
 {
 	struct wsa_macro *wsa = dev_get_drvdata(dev);
+	int ret;
 
 	regcache_cache_only(wsa->regmap, true);
+
+	ret = pm_clk_suspend(dev);
+	if (ret) {
+		regcache_cache_only(wsa->regmap, false);
+		return ret;
+	}
+
 	regcache_mark_dirty(wsa->regmap);
 
-	return pm_clk_suspend(dev);
+	return 0;
 }
 
 static int wsa_macro_runtime_resume(struct device *dev)
 {
 	struct wsa_macro *wsa = dev_get_drvdata(dev);
-	int ret;
+	int ret, sret;
 
-	regcache_cache_only(wsa->regmap, false);
 	ret = pm_clk_resume(dev);
-	if (ret)
+	if (ret) {
+		regcache_cache_only(wsa->regmap, true);
+		regcache_mark_dirty(wsa->regmap);
 		return ret;
+	}
+	regcache_cache_only(wsa->regmap, false);
 
-	return regcache_sync(wsa->regmap);
+	ret = regcache_sync(wsa->regmap);
+	if (ret) {
+		regcache_cache_only(wsa->regmap, true);
+		regcache_mark_dirty(wsa->regmap);
+		sret = pm_clk_suspend(dev);
+		if (sret)
+			dev_err(dev,
+				"failed to suspend clocks after regcache sync failure: %d\n",
+				sret);
+		return ret;
+	}
+
+	return 0;
 }
 
 static const struct dev_pm_ops wsa_macro_pm_ops = {
@@ -2886,7 +2910,6 @@ static struct platform_driver wsa_macro_driver = {
 		.pm = pm_ptr(&wsa_macro_pm_ops),
 	},
 	.probe = wsa_macro_probe,
-	.remove = wsa_macro_remove,
 };
 
 module_platform_driver(wsa_macro_driver);

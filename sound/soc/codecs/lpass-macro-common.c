@@ -32,9 +32,12 @@ struct lpass_macro *lpass_macro_pds_init(struct device *dev)
 		goto macro_err;
 	}
 
-	ret = pm_runtime_resume_and_get(l_pds->macro_pd);
-	if (ret < 0)
-		goto macro_sync_err;
+	l_pds->macro_link = device_link_add(dev, l_pds->macro_pd,
+					    DL_FLAG_STATELESS | DL_FLAG_PM_RUNTIME);
+	if (!l_pds->macro_link) {
+		ret = -EINVAL;
+		goto macro_link_err;
+	}
 
 	l_pds->dcodec_pd = dev_pm_domain_attach_by_name(dev, "dcodec");
 	if (IS_ERR_OR_NULL(l_pds->dcodec_pd)) {
@@ -42,16 +45,20 @@ struct lpass_macro *lpass_macro_pds_init(struct device *dev)
 		goto dcodec_err;
 	}
 
-	ret = pm_runtime_resume_and_get(l_pds->dcodec_pd);
-	if (ret < 0)
-		goto dcodec_sync_err;
+	l_pds->dcodec_link = device_link_add(dev, l_pds->dcodec_pd,
+					     DL_FLAG_STATELESS | DL_FLAG_PM_RUNTIME);
+	if (!l_pds->dcodec_link) {
+		ret = -EINVAL;
+		goto dcodec_link_err;
+	}
+
 	return l_pds;
 
-dcodec_sync_err:
+dcodec_link_err:
 	dev_pm_domain_detach(l_pds->dcodec_pd, false);
 dcodec_err:
-	pm_runtime_put(l_pds->macro_pd);
-macro_sync_err:
+	device_link_del(l_pds->macro_link);
+macro_link_err:
 	dev_pm_domain_detach(l_pds->macro_pd, false);
 macro_err:
 	return ERR_PTR(ret);
@@ -61,10 +68,10 @@ EXPORT_SYMBOL_GPL(lpass_macro_pds_init);
 void lpass_macro_pds_exit(struct lpass_macro *pds)
 {
 	if (pds) {
-		pm_runtime_put(pds->macro_pd);
-		dev_pm_domain_detach(pds->macro_pd, false);
-		pm_runtime_put(pds->dcodec_pd);
+		device_link_del(pds->dcodec_link);
 		dev_pm_domain_detach(pds->dcodec_pd, false);
+		device_link_del(pds->macro_link);
+		dev_pm_domain_detach(pds->macro_pd, false);
 	}
 }
 EXPORT_SYMBOL_GPL(lpass_macro_pds_exit);

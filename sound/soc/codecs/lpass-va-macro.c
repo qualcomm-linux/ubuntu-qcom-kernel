@@ -1347,17 +1347,19 @@ static int fsgen_gate_enable(struct clk_hw *hw)
 {
 	struct va_macro *va = to_va_macro(hw);
 	struct regmap *regmap = va->regmap;
-	int ret;
+	int ret, rpm_ret;
 
-	ret = pm_runtime_get_sync(va->dev);
-	if (ret < 0) {
-		pm_runtime_put_noidle(va->dev);
+	ret = pm_runtime_resume_and_get(va->dev);
+	if (ret < 0)
 		return ret;
-	}
 
 	ret = va_macro_mclk_enable(va, true);
 	if (ret) {
-		pm_runtime_put_noidle(va->dev);
+		rpm_ret = pm_runtime_put_autosuspend(va->dev);
+		if (rpm_ret < 0)
+			dev_warn(va->dev,
+				 "runtime PM put failed in fsgen enable unwind: %d\n",
+				 rpm_ret);
 		return ret;
 	}
 	if (va->has_swr_master)
@@ -1371,6 +1373,7 @@ static void fsgen_gate_disable(struct clk_hw *hw)
 {
 	struct va_macro *va = to_va_macro(hw);
 	struct regmap *regmap = va->regmap;
+	int ret;
 
 	if (va->has_swr_master)
 		regmap_update_bits(regmap, CDC_VA_CLK_RST_CTRL_SWR_CONTROL,
@@ -1378,8 +1381,9 @@ static void fsgen_gate_disable(struct clk_hw *hw)
 
 	va_macro_mclk_enable(va, false);
 
-	pm_runtime_mark_last_busy(va->dev);
-	pm_runtime_put_autosuspend(va->dev);
+	ret = pm_runtime_put_autosuspend(va->dev);
+	if (ret < 0)
+		dev_warn(va->dev, "runtime PM put failed in fsgen disable: %d\n", ret);
 }
 
 static int va_macro_setup_pm_clocks(struct device *dev, struct va_macro *va)
@@ -1611,7 +1615,9 @@ static int va_macro_probe(struct platform_device *pdev)
 	va->has_npl_clk = data->has_npl_clk;
 
 	/* mclk rate */
-	clk_set_rate(va->mclk, 2 * VA_MACRO_MCLK_FREQ);
+	ret = clk_set_rate(va->mclk, 2 * VA_MACRO_MCLK_FREQ);
+	if (ret)
+		goto err;
 
 	if (va->has_npl_clk) {
 		va->npl = devm_clk_get(dev, "npl");
@@ -1620,21 +1626,25 @@ static int va_macro_probe(struct platform_device *pdev)
 			goto err;
 		}
 
-		clk_set_rate(va->npl, 2 * VA_MACRO_MCLK_FREQ);
+		ret = clk_set_rate(va->npl, 2 * VA_MACRO_MCLK_FREQ);
+		if (ret)
+			goto err;
 	}
 
 	ret = va_macro_setup_pm_clocks(dev, va);
 	if (ret)
-		goto err_rpm_disable;
+		goto err;
 
-	pm_runtime_set_autosuspend_delay(dev, 3000);
+	pm_runtime_set_autosuspend_delay(dev, 100);
 	pm_runtime_use_autosuspend(dev);
-	pm_runtime_enable(dev);
+	ret = devm_pm_runtime_enable(dev);
+	if (ret)
+		goto err;
 
 	rpm_ret = pm_runtime_resume_and_get(dev);
 	if (rpm_ret < 0) {
 		ret = rpm_ret;
-		goto err_rpm_disable;
+		goto err;
 	}
 
 	/**
@@ -1695,9 +1705,9 @@ static int va_macro_probe(struct platform_device *pdev)
 	return 0;
 
 err_rpm_put:
-	pm_runtime_put_noidle(dev);
-err_rpm_disable:
-	 pm_runtime_disable(dev);
+	rpm_ret = pm_runtime_put_sync_suspend(dev);
+	if (rpm_ret < 0)
+		dev_warn(dev, "runtime PM sync suspend failed in probe unwind: %d\n", rpm_ret);
 err:
 	lpass_macro_pds_exit(va->pds);
 
@@ -1708,35 +1718,55 @@ static void va_macro_remove(struct platform_device *pdev)
 {
 	struct va_macro *va = dev_get_drvdata(&pdev->dev);
 
-	pm_runtime_disable(&pdev->dev);
-
 	lpass_macro_pds_exit(va->pds);
 }
 
 static int va_macro_runtime_suspend(struct device *dev)
 {
 	struct va_macro *va = dev_get_drvdata(dev);
+	int ret;
 
 	regcache_cache_only(va->regmap, true);
+
+	ret = pm_clk_suspend(dev);
+	if (ret) {
+		regcache_cache_only(va->regmap, false);
+		return ret;
+	}
+
 	regcache_mark_dirty(va->regmap);
 
-	return pm_clk_suspend(dev);
+	return 0;
 }
 
 static int va_macro_runtime_resume(struct device *dev)
 {
 	struct va_macro *va = dev_get_drvdata(dev);
-	int ret;
+	int ret, sret;
 
 	ret = pm_clk_resume(dev);
-	if (ret)
+	if (ret) {
+		regcache_cache_only(va->regmap, true);
+		regcache_mark_dirty(va->regmap);
 		return ret;
+	}
 
 	regcache_cache_only(va->regmap, false);
 
-	return regcache_sync(va->regmap);
-}
+	ret = regcache_sync(va->regmap);
+	if (ret) {
+		regcache_cache_only(va->regmap, true);
+		regcache_mark_dirty(va->regmap);
+		sret = pm_clk_suspend(dev);
+		if (sret)
+			dev_err(va->dev,
+				"failed to suspend clocks after regcache sync failure: %d\n",
+				sret);
+		return ret;
+	}
 
+	return 0;
+}
 
 static const struct dev_pm_ops va_macro_pm_ops = {
 	RUNTIME_PM_OPS(va_macro_runtime_suspend, va_macro_runtime_resume, NULL)
