@@ -107,7 +107,5 @@ struct lpi_pinctrl_variant_data {
 
 int lpi_pinctrl_probe(struct platform_device *pdev);
 void lpi_pinctrl_remove(struct platform_device *pdev);
-int lpi_pinctrl_runtime_suspend(struct device *dev);
-int lpi_pinctrl_runtime_resume(struct device *dev);
 
 #endif /*__PINCTRL_LPASS_LPI_H__*/
