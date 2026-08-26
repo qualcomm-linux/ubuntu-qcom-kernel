@@ -11,7 +11,6 @@
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
-#include <linux/pm_clock.h>
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
 #include <sound/soc.h>
@@ -1349,22 +1348,18 @@ static int fsgen_gate_enable(struct clk_hw *hw)
 	struct regmap *regmap = va->regmap;
 	int ret;
 
-	ret = pm_runtime_get_sync(va->dev);
-	if (ret < 0) {
-		pm_runtime_put_noidle(va->dev);
-		return ret;
+	if (va->has_swr_master) {
+		ret = clk_prepare_enable(va->mclk);
+		if (ret)
+			return ret;
 	}
 
 	ret = va_macro_mclk_enable(va, true);
-	if (ret) {
-		pm_runtime_put_noidle(va->dev);
-		return ret;
-	}
 	if (va->has_swr_master)
 		regmap_update_bits(regmap, CDC_VA_CLK_RST_CTRL_SWR_CONTROL,
 				   CDC_VA_SWR_CLK_EN_MASK, CDC_VA_SWR_CLK_ENABLE);
 
-	return 0;
+	return ret;
 }
 
 static void fsgen_gate_disable(struct clk_hw *hw)
@@ -1377,24 +1372,8 @@ static void fsgen_gate_disable(struct clk_hw *hw)
 			   CDC_VA_SWR_CLK_EN_MASK, 0x0);
 
 	va_macro_mclk_enable(va, false);
-
-	pm_runtime_mark_last_busy(va->dev);
-	pm_runtime_put_autosuspend(va->dev);
-}
-
-static int va_macro_setup_pm_clocks(struct device *dev, struct va_macro *va)
-{
-	int ret;
-
-	ret = devm_pm_clk_create(dev);
-	if (ret)
-		return ret;
-
-	ret = of_pm_clk_add_clks(dev);
-	if (ret < 0)
-		return ret;
-
-	return 0;
+	if (va->has_swr_master)
+		clk_disable_unprepare(va->mclk);
 }
 
 static int fsgen_gate_is_enabled(struct clk_hw *hw)
@@ -1555,7 +1534,6 @@ static int va_macro_probe(struct platform_device *pdev)
 	void __iomem *base;
 	u32 sample_rate = 0;
 	int ret;
-	int rpm_ret;
 
 	va = devm_kzalloc(dev, sizeof(*va), GFP_KERNEL);
 	if (!va)
@@ -1623,18 +1601,22 @@ static int va_macro_probe(struct platform_device *pdev)
 		clk_set_rate(va->npl, 2 * VA_MACRO_MCLK_FREQ);
 	}
 
-	ret = va_macro_setup_pm_clocks(dev, va);
+	ret = clk_prepare_enable(va->macro);
 	if (ret)
-		goto err_rpm_disable;
+		goto err;
 
-	pm_runtime_set_autosuspend_delay(dev, 3000);
-	pm_runtime_use_autosuspend(dev);
-	pm_runtime_enable(dev);
+	ret = clk_prepare_enable(va->dcodec);
+	if (ret)
+		goto err_dcodec;
 
-	rpm_ret = pm_runtime_resume_and_get(dev);
-	if (rpm_ret < 0) {
-		ret = rpm_ret;
-		goto err_rpm_disable;
+	ret = clk_prepare_enable(va->mclk);
+	if (ret)
+		goto err_mclk;
+
+	if (va->has_npl_clk) {
+		ret = clk_prepare_enable(va->npl);
+		if (ret)
+			goto err_npl;
 	}
 
 	/**
@@ -1647,7 +1629,7 @@ static int va_macro_probe(struct platform_device *pdev)
 		/* read version from register */
 		ret = va_macro_set_lpass_codec_version(va);
 		if (ret)
-			goto err_rpm_put;
+			goto err_clkout;
 	}
 
 	if (va->has_swr_master) {
@@ -1677,27 +1659,35 @@ static int va_macro_probe(struct platform_device *pdev)
 					      va_macro_dais,
 					      ARRAY_SIZE(va_macro_dais));
 	if (ret)
-		goto err_rpm_put;
+		goto err_clkout;
+
+	pm_runtime_set_autosuspend_delay(dev, 3000);
+	pm_runtime_use_autosuspend(dev);
+	pm_runtime_mark_last_busy(dev);
+	pm_runtime_set_active(dev);
+	pm_runtime_enable(dev);
 
 	ret = va_macro_register_fsgen_output(va);
 	if (ret)
-		goto err_rpm_put;
+		goto err_clkout;
 
 	va->fsgen = devm_clk_hw_get_clk(dev, &va->hw, "fsgen");
 	if (IS_ERR(va->fsgen)) {
 		ret = PTR_ERR(va->fsgen);
-		goto err_rpm_put;
+		goto err_clkout;
 	}
-
-	pm_runtime_mark_last_busy(dev);
-	pm_runtime_put_autosuspend(dev);
 
 	return 0;
 
-err_rpm_put:
-	pm_runtime_put_noidle(dev);
-err_rpm_disable:
-	 pm_runtime_disable(dev);
+err_clkout:
+	if (va->has_npl_clk)
+		clk_disable_unprepare(va->npl);
+err_npl:
+	clk_disable_unprepare(va->mclk);
+err_mclk:
+	clk_disable_unprepare(va->dcodec);
+err_dcodec:
+	clk_disable_unprepare(va->macro);
 err:
 	lpass_macro_pds_exit(va->pds);
 
@@ -1708,7 +1698,12 @@ static void va_macro_remove(struct platform_device *pdev)
 {
 	struct va_macro *va = dev_get_drvdata(&pdev->dev);
 
-	pm_runtime_disable(&pdev->dev);
+	if (va->has_npl_clk)
+		clk_disable_unprepare(va->npl);
+
+	clk_disable_unprepare(va->mclk);
+	clk_disable_unprepare(va->dcodec);
+	clk_disable_unprepare(va->macro);
 
 	lpass_macro_pds_exit(va->pds);
 }
@@ -1720,7 +1715,12 @@ static int va_macro_runtime_suspend(struct device *dev)
 	regcache_cache_only(va->regmap, true);
 	regcache_mark_dirty(va->regmap);
 
-	return pm_clk_suspend(dev);
+	if (va->has_npl_clk)
+		clk_disable_unprepare(va->npl);
+
+	clk_disable_unprepare(va->mclk);
+
+	return 0;
 }
 
 static int va_macro_runtime_resume(struct device *dev)
@@ -1728,13 +1728,25 @@ static int va_macro_runtime_resume(struct device *dev)
 	struct va_macro *va = dev_get_drvdata(dev);
 	int ret;
 
-	ret = pm_clk_resume(dev);
-	if (ret)
+	ret = clk_prepare_enable(va->mclk);
+	if (ret) {
+		dev_err(va->dev, "unable to prepare mclk\n");
 		return ret;
+	}
+
+	if (va->has_npl_clk) {
+		ret = clk_prepare_enable(va->npl);
+		if (ret) {
+			clk_disable_unprepare(va->mclk);
+			dev_err(va->dev, "unable to prepare npl\n");
+			return ret;
+		}
+	}
 
 	regcache_cache_only(va->regmap, false);
+	regcache_sync(va->regmap);
 
-	return regcache_sync(va->regmap);
+	return 0;
 }
 
 

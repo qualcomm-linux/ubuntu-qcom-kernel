@@ -14,7 +14,6 @@
 #include <sound/soc-dapm.h>
 #include <linux/pm_runtime.h>
 #include <linux/of_platform.h>
-#include <linux/pm_clock.h>
 #include <sound/tlv.h>
 
 #include "lpass-macro-common.h"
@@ -2530,15 +2529,15 @@ static const struct snd_soc_dapm_route wsa_audio_map[] = {
 static int wsa_swrm_clock(struct wsa_macro *wsa, bool enable)
 {
 	struct regmap *regmap = wsa->regmap;
-	int ret;
-
-	ret = pm_runtime_get_sync(wsa->dev);
-	if (ret < 0) {
-		pm_runtime_put_noidle(wsa->dev);
-		return ret;
-	}
 
 	if (enable) {
+		int ret;
+
+		ret = clk_prepare_enable(wsa->mclk);
+		if (ret) {
+			dev_err(wsa->dev, "failed to enable mclk\n");
+			return ret;
+		}
 		wsa_macro_mclk_enable(wsa, true);
 
 		regmap_update_bits(regmap, CDC_WSA_CLK_RST_CTRL_SWR_CONTROL,
@@ -2549,10 +2548,9 @@ static int wsa_swrm_clock(struct wsa_macro *wsa, bool enable)
 		regmap_update_bits(regmap, CDC_WSA_CLK_RST_CTRL_SWR_CONTROL,
 				   CDC_WSA_SWR_CLK_EN_MASK, 0);
 		wsa_macro_mclk_enable(wsa, false);
+		clk_disable_unprepare(wsa->mclk);
 	}
 
-	pm_runtime_mark_last_busy(wsa->dev);
-	pm_runtime_put_autosuspend(wsa->dev);
 	return 0;
 }
 
@@ -2774,26 +2772,27 @@ static int wsa_macro_probe(struct platform_device *pdev)
 
 	/* set MCLK and NPL rates */
 	clk_set_rate(wsa->mclk, WSA_MACRO_MCLK_FREQ);
-	if (wsa->npl)
-		clk_set_rate(wsa->npl, WSA_MACRO_MCLK_FREQ);
+	clk_set_rate(wsa->npl, WSA_MACRO_MCLK_FREQ);
 
-	ret = devm_pm_clk_create(dev);
+	ret = clk_prepare_enable(wsa->macro);
 	if (ret)
-		return ret;
+		goto err;
 
-	ret = of_pm_clk_add_clks(dev);
-	if (ret < 0)
-		return ret;
+	ret = clk_prepare_enable(wsa->dcodec);
+	if (ret)
+		goto err_dcodec;
 
-	pm_runtime_set_autosuspend_delay(dev, 3000);
-	pm_runtime_use_autosuspend(dev);
-	pm_runtime_enable(dev);
+	ret = clk_prepare_enable(wsa->mclk);
+	if (ret)
+		goto err_mclk;
 
+	ret = clk_prepare_enable(wsa->npl);
+	if (ret)
+		goto err_npl;
 
-	ret = pm_runtime_resume_and_get(dev);
-	if (ret < 0) {
-		goto err_rpm_disable;
-	}
+	ret = clk_prepare_enable(wsa->fsgen);
+	if (ret)
+		goto err_fsgen;
 
 	/* reset swr ip */
 	regmap_update_bits(wsa->regmap, CDC_WSA_CLK_RST_CTRL_SWR_CONTROL,
@@ -2810,26 +2809,44 @@ static int wsa_macro_probe(struct platform_device *pdev)
 					      wsa_macro_dai,
 					      ARRAY_SIZE(wsa_macro_dai));
 	if (ret)
-		goto err_rpm_put;
+		goto err_clkout;
+
+	pm_runtime_set_autosuspend_delay(dev, 3000);
+	pm_runtime_use_autosuspend(dev);
+	pm_runtime_mark_last_busy(dev);
+	pm_runtime_set_active(dev);
+	pm_runtime_enable(dev);
 
 	ret = wsa_macro_register_mclk_output(wsa);
 	if (ret)
-		goto err_rpm_put;
-
-	pm_runtime_mark_last_busy(dev);
-	pm_runtime_put_autosuspend(dev);
+		goto err_clkout;
 
 	return 0;
-err_rpm_put:
-	pm_runtime_put_noidle(dev);
-err_rpm_disable:
-	pm_runtime_disable(dev);
+
+err_clkout:
+	clk_disable_unprepare(wsa->fsgen);
+err_fsgen:
+	clk_disable_unprepare(wsa->npl);
+err_npl:
+	clk_disable_unprepare(wsa->mclk);
+err_mclk:
+	clk_disable_unprepare(wsa->dcodec);
+err_dcodec:
+	clk_disable_unprepare(wsa->macro);
+err:
 	return ret;
+
 }
 
 static void wsa_macro_remove(struct platform_device *pdev)
 {
-	pm_runtime_disable(&pdev->dev);
+	struct wsa_macro *wsa = dev_get_drvdata(&pdev->dev);
+
+	clk_disable_unprepare(wsa->macro);
+	clk_disable_unprepare(wsa->dcodec);
+	clk_disable_unprepare(wsa->mclk);
+	clk_disable_unprepare(wsa->npl);
+	clk_disable_unprepare(wsa->fsgen);
 }
 
 static int wsa_macro_runtime_suspend(struct device *dev)
@@ -2839,7 +2856,11 @@ static int wsa_macro_runtime_suspend(struct device *dev)
 	regcache_cache_only(wsa->regmap, true);
 	regcache_mark_dirty(wsa->regmap);
 
-	return pm_clk_suspend(dev);
+	clk_disable_unprepare(wsa->fsgen);
+	clk_disable_unprepare(wsa->npl);
+	clk_disable_unprepare(wsa->mclk);
+
+	return 0;
 }
 
 static int wsa_macro_runtime_resume(struct device *dev)
@@ -2847,12 +2868,34 @@ static int wsa_macro_runtime_resume(struct device *dev)
 	struct wsa_macro *wsa = dev_get_drvdata(dev);
 	int ret;
 
-	regcache_cache_only(wsa->regmap, false);
-	ret = pm_clk_resume(dev);
-	if (ret)
+	ret = clk_prepare_enable(wsa->mclk);
+	if (ret) {
+		dev_err(dev, "unable to prepare mclk\n");
 		return ret;
+	}
 
-	return regcache_sync(wsa->regmap);
+	ret = clk_prepare_enable(wsa->npl);
+	if (ret) {
+		dev_err(dev, "unable to prepare mclkx2\n");
+		goto err_npl;
+	}
+
+	ret = clk_prepare_enable(wsa->fsgen);
+	if (ret) {
+		dev_err(dev, "unable to prepare fsgen\n");
+		goto err_fsgen;
+	}
+
+	regcache_cache_only(wsa->regmap, false);
+	regcache_sync(wsa->regmap);
+
+	return 0;
+err_fsgen:
+	clk_disable_unprepare(wsa->npl);
+err_npl:
+	clk_disable_unprepare(wsa->mclk);
+
+	return ret;
 }
 
 static const struct dev_pm_ops wsa_macro_pm_ops = {
