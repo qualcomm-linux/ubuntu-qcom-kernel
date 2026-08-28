@@ -51,14 +51,24 @@ if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
   conclusion="$(jq -r '.workflow_run.conclusion' "$GITHUB_EVENT_PATH")"
   head_sha="$(jq -r '.workflow_run.head_sha' "$GITHUB_EVENT_PATH")"
 
+  [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Invalid triggering workflow head SHA: ${head_sha}" >&2; exit 1; }
+
+  # GET /commits/{sha}/pulls does not reliably resolve commits that only
+  # exist on a fork (reachable in this repo solely via the hidden
+  # refs/pull/<n>/head ref, never an actual branch). List open pull
+  # requests against resolute-qcom-devel directly and match on head.sha
+  # instead, which works the same for same-repo and fork-originated PRs.
   pull_requests="$(
-    gh api "repos/${GITHUB_REPOSITORY}/commits/${head_sha}/pulls" \
+    gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls" \
       -H "Accept: application/vnd.github+json" \
-      --jq '[.[] | select(.base.ref == "resolute-qcom-devel" and .head.sha == "'"$head_sha"'")]'
+      -X GET \
+      -f state=open \
+      -f base=resolute-qcom-devel \
+      | jq -s --arg sha "$head_sha" '[.[][] | select(.head.sha == $sha)]'
   )"
   pr_count="$(jq 'length' <<< "$pull_requests")"
   [[ "$pr_count" == "1" ]] || {
-    echo "::error::Expected exactly one resolute-qcom-devel pull request for ${head_sha}; found ${pr_count}." >&2
+    echo "::error::Expected exactly one open resolute-qcom-devel pull request for ${head_sha}; found ${pr_count}." >&2
     exit 1
   }
   pr_number="$(jq -r '.[0].number' <<< "$pull_requests")"

@@ -45,10 +45,18 @@ jq -e \
     exit 1
   }
 
+# GET /commits/{sha}/pulls does not reliably resolve commits that only
+# exist on a fork (reachable in this repo solely via the hidden
+# refs/pull/<n>/head ref, never an actual branch). List open pull
+# requests against resolute-qcom-devel directly and match on head.sha
+# instead, which works the same for same-repo and fork-originated PRs.
 pull_requests="$(
-  gh api "repos/qualcomm-linux/pkg-linux-qcom-canonical/commits/${head_sha}/pulls" \
+  gh api --paginate "repos/qualcomm-linux/pkg-linux-qcom-canonical/pulls" \
     -H "Accept: application/vnd.github+json" \
-    --jq '[.[] | select(.base.ref == "resolute-qcom-devel" and .head.sha == "'"$head_sha"'")]'
+    -X GET \
+    -f state=open \
+    -f base=resolute-qcom-devel \
+    | jq -s --arg sha "$head_sha" '[.[][] | select(.head.sha == $sha)]'
 )"
 [[ "$(jq 'length' <<< "$pull_requests")" == "1" ]] || { echo "::error::Unable to identify one matching Canonical pull request." >&2; exit 1; }
 [[ "$(jq -r '.[0].number' <<< "$pull_requests")" == "$pr_number" ]] || { echo "::error::Callback pull request number does not match the kernel commit." >&2; exit 1; }
