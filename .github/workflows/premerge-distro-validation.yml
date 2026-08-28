@@ -1,0 +1,257 @@
+# SPDX-License-Identifier: BSD-3-Clause
+
+name: "Pre-merge distro image validation"
+
+on: # zizmor: ignore[dangerous-triggers]
+  workflow_run:
+    workflows:
+      - "Pre-merge PR build"
+    types:
+      - completed
+
+  repository_dispatch:
+    types:
+      - canonical-premerge-distro-result
+
+permissions:
+  contents: read
+
+concurrency:
+  group: >-
+    premerge-distro-validation-${{
+      github.event_name == 'repository_dispatch' && 'callback' || 'request'
+    }}-${{
+      github.event.client_payload.pr_number ||
+      github.event.workflow_run.head_repository.full_name ||
+      github.repository
+    }}-${{
+      github.event.workflow_run.head_branch ||
+      github.run_id
+    }}
+  cancel-in-progress: true
+
+jobs:
+  workflow-context:
+    name: "Resolve kernel validation context"
+    if: ${{ github.event_name == 'workflow_run' }}
+    runs-on: [self-hosted, lecore-prd-u2404-arm64-xlrg-od-ephem]
+    outputs:
+      should-validate: ${{ steps.context.outputs.should-validate }}
+      kernel-conclusion: ${{ steps.context.outputs.kernel-conclusion }}
+      kernel-run-id: ${{ steps.context.outputs.kernel-run-id }}
+      kernel-run-attempt: ${{ steps.context.outputs.kernel-run-attempt }}
+      kernel-build-id: ${{ steps.context.outputs.kernel-build-id }}
+      kernel-s3-prefix: ${{ steps.context.outputs.kernel-s3-prefix }}
+      pr-number: ${{ steps.context.outputs.pr-number }}
+      head-sha: ${{ steps.context.outputs.head-sha }}
+      request-id: ${{ steps.context.outputs.request-id }}
+    steps:
+      - name: Checkout orchestration helpers
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install GitHub CLI
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gh
+
+      - id: context
+        name: Validate triggering workflow context
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          bash ./scripts/resolve-distro-validation-context.sh
+
+  request-validation:
+    name: "Request distro image validation"
+    needs: workflow-context
+    if: ${{ needs.workflow-context.outputs.should-validate == 'true' }}
+    runs-on: [self-hosted, lecore-prd-u2404-arm64-xlrg-od-ephem]
+    permissions:
+      checks: write
+      contents: read
+      statuses: write
+    steps:
+      - name: Checkout orchestration helpers
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install GitHub CLI
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gh
+
+      - id: check
+        name: Start distro validation Check Run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODE: start
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ needs.workflow-context.outputs.head-sha }}
+          PR_NUMBER: ${{ needs.workflow-context.outputs.pr-number }}
+          REQUEST_ID: ${{ needs.workflow-context.outputs.request-id }}
+          KERNEL_BUILD_ID: ${{ needs.workflow-context.outputs.kernel-build-id }}
+          IMAGE_S3_PREFIX: qualcomm-linux/${{ needs.workflow-context.outputs.kernel-s3-prefix }}/${{ needs.workflow-context.outputs.kernel-build-id }}
+          DETAILS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          bash ./scripts/report-distro-validation-check.sh
+
+      - name: Report validation pending
+        if: ${{ steps.check.outputs.should-dispatch == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ needs.workflow-context.outputs.head-sha }}
+          STATE: pending
+          DESCRIPTION: "Building Canonical server and desktop distro images"
+          TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          bash ./scripts/report-distro-validation-status.sh
+
+      - name: Dispatch trusted distro validation request
+        if: ${{ steps.check.outputs.should-dispatch == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.DEB_PKG_BOT_CI_TOKEN }}
+          DISTRO_REPOSITORY: qualcomm-linux/qcom-distro-images
+          KERNEL_REPOSITORY: ${{ github.repository }}
+          KERNEL_RUN_ID: ${{ needs.workflow-context.outputs.kernel-run-id }}
+          KERNEL_RUN_ATTEMPT: ${{ needs.workflow-context.outputs.kernel-run-attempt }}
+          KERNEL_BUILD_ID: ${{ needs.workflow-context.outputs.kernel-build-id }}
+          KERNEL_S3_PREFIX: ${{ needs.workflow-context.outputs.kernel-s3-prefix }}
+          PR_NUMBER: ${{ needs.workflow-context.outputs.pr-number }}
+          HEAD_SHA: ${{ needs.workflow-context.outputs.head-sha }}
+          REQUEST_ID: ${{ needs.workflow-context.outputs.request-id }}
+        run: |
+          set -euo pipefail
+          bash ./scripts/send-distro-validation-request.sh
+
+  kernel-failure:
+    name: "Report kernel validation failure"
+    needs: workflow-context
+    if: ${{ needs.workflow-context.outputs.kernel-conclusion != 'success' }}
+    runs-on: [self-hosted, lecore-prd-u2404-arm64-xlrg-od-ephem]
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - name: Checkout status helper
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install GitHub CLI
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gh
+
+      - name: Publish failure status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ needs.workflow-context.outputs.head-sha }}
+          STATE: failure
+          DESCRIPTION: "Canonical kernel build failed before distro validation"
+          TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          bash ./scripts/report-distro-validation-status.sh
+          exit 1
+
+  callback-context:
+    name: "Validate distro callback"
+    if: ${{ github.event_name == 'repository_dispatch' }}
+    runs-on: [self-hosted, lecore-prd-u2404-arm64-xlrg-od-ephem]
+    outputs:
+      state: ${{ steps.callback.outputs.state }}
+      description: ${{ steps.callback.outputs.description }}
+      check-conclusion: ${{ steps.callback.outputs.check-conclusion }}
+      pr-number: ${{ steps.callback.outputs.pr-number }}
+      head-sha: ${{ steps.callback.outputs.head-sha }}
+      request-id: ${{ steps.callback.outputs.request-id }}
+      kernel-build-id: ${{ steps.callback.outputs.kernel-build-id }}
+      distro-build-id: ${{ steps.callback.outputs.distro-build-id }}
+      image-s3-prefix: ${{ steps.callback.outputs.image-s3-prefix }}
+      distro-run-url: ${{ steps.callback.outputs.distro-run-url }}
+    steps:
+      - name: Checkout callback validator
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install GitHub CLI
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gh
+
+      - id: callback
+        name: Validate returned distro result
+        env:
+          GH_TOKEN: ${{ secrets.DEB_PKG_BOT_CI_TOKEN }}
+          BUCKET: qli-prd-lecore-gh-artifacts
+        run: |
+          set -euo pipefail
+          bash ./scripts/validate-distro-validation-callback.sh
+
+  callback-status:
+    name: "Report distro validation result"
+    needs: callback-context
+    if: ${{ always() && needs.callback-context.result == 'success' }}
+    runs-on: [self-hosted, lecore-prd-u2404-arm64-xlrg-od-ephem]
+    permissions:
+      checks: write
+      contents: read
+      statuses: write
+    steps:
+      - name: Checkout status helper
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install GitHub CLI
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gh
+
+      - name: Publish final status and summary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODE: complete
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ needs.callback-context.outputs.head-sha }}
+          PR_NUMBER: ${{ needs.callback-context.outputs.pr-number }}
+          REQUEST_ID: ${{ needs.callback-context.outputs.request-id }}
+          KERNEL_BUILD_ID: ${{ needs.callback-context.outputs.kernel-build-id }}
+          CONCLUSION: ${{ needs.callback-context.outputs.check-conclusion }}
+          DETAILS_URL: ${{ needs.callback-context.outputs.distro-run-url }}
+          DISTRO_BUILD_ID: ${{ needs.callback-context.outputs.distro-build-id }}
+          IMAGE_S3_PREFIX: ${{ needs.callback-context.outputs.image-s3-prefix }}
+          STATE: ${{ needs.callback-context.outputs.state }}
+          DESCRIPTION: ${{ needs.callback-context.outputs.description }}
+          TARGET_URL: ${{ needs.callback-context.outputs.distro-run-url }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Canonical Premerge Distro Validation"
+            echo
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Pull request | \`#${PR_NUMBER}\` |"
+            echo "| Result | \`${STATE}\` |"
+            echo "| Kernel build ID | \`${KERNEL_BUILD_ID}\` |"
+            echo "| Distro build ID | \`${DISTRO_BUILD_ID}\` |"
+            echo "| Image S3 prefix | \`${IMAGE_S3_PREFIX}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          bash ./scripts/report-distro-validation-check.sh
+          bash ./scripts/report-distro-validation-status.sh
+          [[ "$STATE" == "success" ]]
