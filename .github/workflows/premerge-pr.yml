@@ -31,7 +31,7 @@ concurrency:
 jobs:
   build:
     name: "Build check"
-    uses: qualcomm-linux/pkg-linux-qcom-canonical/.github/workflows/build-kernel.yml@main
+    uses: qualcomm-linux/ubuntu-qcom-kernel/.github/workflows/build-kernel.yml@main
     with:
       suite: resolute-qcom-devel
       ref: refs/pull/${{ github.event.pull_request.number }}/merge
