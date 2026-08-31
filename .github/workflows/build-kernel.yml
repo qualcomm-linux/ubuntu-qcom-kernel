@@ -198,9 +198,9 @@ jobs:
       #    - If kernel_version is empty: checkout the suite branch HEAD
       #      (test/dev builds).
       #    Note: actions/checkout checks out a ref of THIS repository
-      #    (pkg-linux-qcom-canonical). The resolute-qcom/noble/... branches of
+      #    (ubuntu-qcom-kernel). The resolute-qcom/noble/... branches of
       #    this repo contain the full kernel source tree mirrored by
-      #    fetch-source-pkg.yml — they are not the main branch.
+      #    fetch-source-pkg.yml; they are not the main branch.
       # -----------------------------------------------------------------------
       - name: Checkout kernel source
         uses: actions/checkout@v6

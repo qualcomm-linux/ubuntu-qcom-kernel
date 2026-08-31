@@ -26,7 +26,7 @@ validate_common() {
   emit_output kernel-build-id "${run_id}-${run_attempt}"
   emit_output kernel-run-id "$run_id"
   emit_output kernel-run-attempt "$run_attempt"
-  emit_output kernel-s3-prefix "pkg/premerge/pkg-linux-qcom-canonical"
+  emit_output kernel-s3-prefix "pkg/premerge/ubuntu-qcom-kernel"
   emit_output pr-number "$pr_number"
   emit_output head-sha "$head_sha"
   emit_output request-id "${run_id}-${run_attempt}-${head_sha}"

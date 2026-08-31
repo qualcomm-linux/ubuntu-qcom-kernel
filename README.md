@@ -1,4 +1,4 @@
-# pkg-linux-qcom-canonical
+# ubuntu-qcom-kernel
 
 Mirrors the Canonical kernel optimized for Qualcomm on `resolute-qcom`, from
 [Launchpad](https://git.launchpad.net/~carmel-team/ubuntu/+source/linux/+git/resolute/log/?h=master-next),
@@ -8,7 +8,7 @@ This is not a product or actively supported by Qualcomm. We are not accepting
 contributions in this repository.
 
 > [!TIP]
-> Latest upload: see the **[tags page](https://github.com/qualcomm-linux/pkg-linux-qcom-canonical/tags)**.
+> Latest upload: see the **[tags page](https://github.com/qualcomm-linux/ubuntu-qcom-kernel/tags)**.
 
 ## At a glance
 

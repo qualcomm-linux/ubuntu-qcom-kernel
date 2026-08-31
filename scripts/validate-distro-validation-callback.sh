@@ -23,7 +23,7 @@ distro_run_attempt="$(jq -r '.distro_run_attempt' <<< "$payload")"
 
 [[ "$(jq -r '.action' "$GITHUB_EVENT_PATH")" == "canonical-premerge-distro-result" ]] || { echo "::error::Unexpected callback event type." >&2; exit 1; }
 [[ "$kernel_build_id" =~ ^[0-9]+-[0-9]+$ ]] || { echo "::error::Invalid kernel build ID." >&2; exit 1; }
-[[ "$kernel_s3_prefix" == "pkg/premerge/pkg-linux-qcom-canonical" ]] || { echo "::error::Unexpected kernel S3 prefix." >&2; exit 1; }
+[[ "$kernel_s3_prefix" == "pkg/premerge/ubuntu-qcom-kernel" ]] || { echo "::error::Unexpected kernel S3 prefix." >&2; exit 1; }
 [[ "$pr_number" =~ ^[0-9]+$ ]] || { echo "::error::Invalid pull request number." >&2; exit 1; }
 [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Invalid pull request head SHA." >&2; exit 1; }
 [[ "$distro_result" =~ ^(success|failure|cancelled|skipped)$ ]] || { echo "::error::Invalid distro result." >&2; exit 1; }
@@ -31,7 +31,7 @@ distro_run_attempt="$(jq -r '.distro_run_attempt' <<< "$payload")"
 [[ "$request_id" == "${kernel_build_id}-${head_sha}" ]] || { echo "::error::Request ID does not match the kernel build and head SHA." >&2; exit 1; }
 
 IFS=- read -r kernel_run_id kernel_run_attempt <<< "$kernel_build_id"
-kernel_run="$(gh api "repos/qualcomm-linux/pkg-linux-qcom-canonical/actions/runs/${kernel_run_id}")"
+kernel_run="$(gh api "repos/qualcomm-linux/ubuntu-qcom-kernel/actions/runs/${kernel_run_id}")"
 jq -e \
   --argjson attempt "$kernel_run_attempt" \
   --arg head_sha "$head_sha" \
@@ -51,7 +51,7 @@ jq -e \
 # requests against resolute-qcom-devel directly and match on head.sha
 # instead, which works the same for same-repo and fork-originated PRs.
 pull_requests="$(
-  gh api --paginate "repos/qualcomm-linux/pkg-linux-qcom-canonical/pulls" \
+  gh api --paginate "repos/qualcomm-linux/ubuntu-qcom-kernel/pulls" \
     -H "Accept: application/vnd.github+json" \
     -X GET \
     -f state=open \

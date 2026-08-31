@@ -6,7 +6,7 @@ How the mirror and build pipeline work. To contribute patches, see
 ## Repository branch layout
 
 ```
-pkg-linux-qcom-canonical
+ubuntu-qcom-kernel
 │
 ├── main branch                       ← CI orchestrator: workflows, scripts, docs
 │   ├── .github/workflows/
@@ -46,16 +46,16 @@ The maintenance workflows below are manual (`Actions → … → Run workflow`, 
 
 ```bash
 # Sync the mirror to the latest upstream upload (no inputs; idempotent).
-gh workflow run fetch-source-pkg.yml --repo qualcomm-linux/pkg-linux-qcom-canonical
+gh workflow run fetch-source-pkg.yml --repo qualcomm-linux/ubuntu-qcom-kernel
 
 # Build .deb packages. Defaults to resolute-qcom-devel HEAD; set the suite input to
 # resolute-qcom for the mirror, or kernel_version for an exact tag. The dbgsym
 # input (default true) also builds the unstripped -dbgsym.ddeb.
-gh workflow run build-kernel.yml --repo qualcomm-linux/pkg-linux-qcom-canonical
+gh workflow run build-kernel.yml --repo qualcomm-linux/ubuntu-qcom-kernel
 
 # One-time only, before the first sync: seed resolute-qcom with history (into
 # resolute-qcom-seed, which a human then promotes to the live branch).
-gh workflow run bootstrap-history.yml --repo qualcomm-linux/pkg-linux-qcom-canonical
+gh workflow run bootstrap-history.yml --repo qualcomm-linux/ubuntu-qcom-kernel
 ```
 
 PRs into `resolute-qcom-devel` get a pre-merge build check (`premerge-pr.yml` on
@@ -73,7 +73,7 @@ workflow and builds the fixed Resolute IoT server and desktop matrix using only
 the Canonical kernel packages from that exact premerge build.
 
 The two image tarballs are uploaded alongside the kernel packages under the same
-`pkg/premerge/pkg-linux-qcom-canonical/<run-id>-<attempt>/` directory. A
+`pkg/premerge/ubuntu-qcom-kernel/<run-id>-<attempt>/` directory. A
 `distro-validation.json` completion marker is written only after both image
 uploads are verified. qcom-distro-images returns the distro build ID and result
 through a repository dispatch callback. The Canonical callback handler verifies

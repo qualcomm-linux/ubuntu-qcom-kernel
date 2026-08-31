@@ -15,11 +15,11 @@ set -euo pipefail
 : "${REQUEST_ID:?REQUEST_ID is required}"
 
 [[ "$DISTRO_REPOSITORY" == "qualcomm-linux/qcom-distro-images" ]] || { echo "::error::Unexpected distro repository." >&2; exit 1; }
-[[ "$KERNEL_REPOSITORY" == "qualcomm-linux/pkg-linux-qcom-canonical" ]] || { echo "::error::Unexpected kernel repository." >&2; exit 1; }
+[[ "$KERNEL_REPOSITORY" == "qualcomm-linux/ubuntu-qcom-kernel" ]] || { echo "::error::Unexpected kernel repository." >&2; exit 1; }
 [[ "$KERNEL_RUN_ID" =~ ^[0-9]+$ ]] || { echo "::error::Invalid kernel run ID." >&2; exit 1; }
 [[ "$KERNEL_RUN_ATTEMPT" =~ ^[0-9]+$ ]] || { echo "::error::Invalid kernel run attempt." >&2; exit 1; }
 [[ "$KERNEL_BUILD_ID" == "${KERNEL_RUN_ID}-${KERNEL_RUN_ATTEMPT}" ]] || { echo "::error::Kernel build ID does not match its run identity." >&2; exit 1; }
-[[ "$KERNEL_S3_PREFIX" == "pkg/premerge/pkg-linux-qcom-canonical" ]] || { echo "::error::Unexpected kernel S3 prefix." >&2; exit 1; }
+[[ "$KERNEL_S3_PREFIX" == "pkg/premerge/ubuntu-qcom-kernel" ]] || { echo "::error::Unexpected kernel S3 prefix." >&2; exit 1; }
 [[ "$PR_NUMBER" =~ ^[0-9]+$ ]] || { echo "::error::Invalid pull request number." >&2; exit 1; }
 [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Invalid pull request head SHA." >&2; exit 1; }
 [[ "$REQUEST_ID" == "${KERNEL_BUILD_ID}-${HEAD_SHA}" ]] || { echo "::error::Request ID does not match the build and head SHA." >&2; exit 1; }

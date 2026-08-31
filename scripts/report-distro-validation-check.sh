@@ -23,13 +23,13 @@ emit_output() {
 }
 
 [[ "$MODE" =~ ^(start|complete)$ ]] || { echo "::error::Invalid Check Run mode: ${MODE}" >&2; exit 1; }
-[[ "$REPOSITORY" == "qualcomm-linux/pkg-linux-qcom-canonical" ]] || { echo "::error::Unexpected repository: ${REPOSITORY}" >&2; exit 1; }
+[[ "$REPOSITORY" == "qualcomm-linux/ubuntu-qcom-kernel" ]] || { echo "::error::Unexpected repository: ${REPOSITORY}" >&2; exit 1; }
 [[ "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Invalid commit SHA: ${COMMIT_SHA}" >&2; exit 1; }
 [[ "$PR_NUMBER" =~ ^[0-9]+$ ]] || { echo "::error::Invalid pull request number: ${PR_NUMBER}" >&2; exit 1; }
 [[ "$KERNEL_BUILD_ID" =~ ^[0-9]+-[0-9]+$ ]] || { echo "::error::Invalid kernel build ID: ${KERNEL_BUILD_ID}" >&2; exit 1; }
 [[ "$REQUEST_ID" == "${KERNEL_BUILD_ID}-${COMMIT_SHA}" ]] || { echo "::error::Request ID does not match the kernel build and commit SHA." >&2; exit 1; }
-[[ "$IMAGE_S3_PREFIX" == "qualcomm-linux/pkg/premerge/pkg-linux-qcom-canonical/${KERNEL_BUILD_ID}" ]] || { echo "::error::Unexpected image S3 prefix: ${IMAGE_S3_PREFIX}" >&2; exit 1; }
-[[ "$DETAILS_URL" =~ ^https://github\.com/qualcomm-linux/(pkg-linux-qcom-canonical|qcom-distro-images)/actions/runs/[0-9]+$ ]] || { echo "::error::Unexpected Check Run details URL: ${DETAILS_URL}" >&2; exit 1; }
+[[ "$IMAGE_S3_PREFIX" == "qualcomm-linux/pkg/premerge/ubuntu-qcom-kernel/${KERNEL_BUILD_ID}" ]] || { echo "::error::Unexpected image S3 prefix: ${IMAGE_S3_PREFIX}" >&2; exit 1; }
+[[ "$DETAILS_URL" =~ ^https://github\.com/qualcomm-linux/(ubuntu-qcom-kernel|qcom-distro-images)/actions/runs/[0-9]+$ ]] || { echo "::error::Unexpected Check Run details URL: ${DETAILS_URL}" >&2; exit 1; }
 
 if [[ "$MODE" == "complete" ]]; then
   [[ "$CONCLUSION" =~ ^(success|failure|cancelled|skipped)$ ]] || { echo "::error::Invalid Check Run conclusion: ${CONCLUSION}" >&2; exit 1; }

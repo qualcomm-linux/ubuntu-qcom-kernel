@@ -23,8 +23,8 @@ work on a feature branch and open a PR into `resolute-qcom-devel`. Never commit 
 upload.
 
 ```bash
-git clone https://github.com/qualcomm-linux/pkg-linux-qcom-canonical.git
-cd pkg-linux-qcom-canonical
+git clone https://github.com/qualcomm-linux/ubuntu-qcom-kernel.git
+cd ubuntu-qcom-kernel
 git checkout -b my-feature origin/resolute-qcom-devel   # feature branch off the integration branch
 # add your patches, commit DCO-signed (git commit -s), then:
 git push origin my-feature

@@ -1,4 +1,4 @@
-# Contributing to pkg-linux-qcom-canonical
+# Contributing to ubuntu-qcom-kernel
 
 This project is not accepting contributions.
 
