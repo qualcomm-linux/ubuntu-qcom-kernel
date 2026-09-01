@@ -2062,7 +2062,8 @@ CONFIG_SDM_VIDEOCC_845                          policy<{'arm64': 'y'}>
 CONFIG_SENSORS_AMC6821                          policy<{'arm64': 'y'}>
 CONFIG_SENSORS_EMC2305                          policy<{'arm64': 'y'}>
 CONFIG_SENSORS_MACSMC_HWMON                     policy<{'arm64': '-'}>
-CONFIG_SENSORS_QCOM_BCL                         policy<{'arm64': 'y'}>
+CONFIG_SENSORS_QCOM_BCL                         policy<{'arm64': '-'}>
+CONFIG_SENSORS_QCOM_SPMI_BCL                    policy<{'arm64': 'n'}>
 CONFIG_SENSORS_SA67MCU                          policy<{'arm64': '-'}>
 CONFIG_SENSORS_SG2042_MCU                       policy<{'arm64': '-'}>
 CONFIG_SENSORS_SL28CPLD                         policy<{'arm64': '-'}>
@@ -2604,6 +2605,8 @@ CONFIG_V4L2_JPEG_HELPER                         policy<{'arm64': '-'}>
 CONFIG_V4L2_VP9                                 policy<{'arm64': '-'}>
 CONFIG_VCPU_STALL_DETECTOR                      policy<{'arm64': 'y'}>
 CONFIG_VFIO_FSL_MC                              policy<{'arm64': '-'}>
+CONFIG_VF_TIMER_NONE                            policy<{'arm64': '-'}>
+CONFIG_VF_USE_PIT_TIMER                         policy<{'arm64': '-'}>
 CONFIG_VHOST                                    policy<{'arm64': 'y'}>
 CONFIG_VHOST_IOTLB                              policy<{'arm64': 'y'}>
 CONFIG_VHOST_NET                                policy<{'arm64': 'y'}>
