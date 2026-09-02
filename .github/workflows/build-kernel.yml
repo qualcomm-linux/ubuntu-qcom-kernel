@@ -298,7 +298,9 @@ jobs:
       - name: Checkout CI scripts
         uses: actions/checkout@v6
         with:
-          ref: main
+          # TEMPORARY: pre-merge validation for PR #108. Revert to "main"
+          # before marking this ready for review.
+          ref: feat/qcom-devel-local-version-suffix
           # Own path, matching kernel-src and docker-pkg-build: checking out
           # to the workspace root would clean the whole workspace, deleting
           # kernel-src.
