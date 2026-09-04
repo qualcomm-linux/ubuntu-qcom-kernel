@@ -1,0 +1,500 @@
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# build-kernel.yml
+#
+# Builds Ubuntu kernel .deb packages from a branch
+# (e.g. "noble", "resolute-qcom") that was populated by fetch-source-pkg.yml.
+#
+# The build always runs inside the base-suite-matched
+# ghcr.io/qualcomm-linux/pkg-builder:<base_suite> container via
+# docker-pkg-build, ensuring a clean, reproducible environment
+# that exactly matches the target distro.
+#
+# Output .deb packages are uploaded ONLY to the S3 bucket
+# (qli-prd-lecore-gh-artifacts), on the lecore-production runner. No GitHub
+# Actions artifacts and no GitHub Releases are produced.
+
+name: "Build: Canonical Kernel .deb Packages"
+
+on:
+  # Daily build at 15:00 PST (23:00 UTC; GitHub cron runs in UTC). A scheduled run
+  # passes no inputs, so it builds resolute-qcom-devel HEAD (the SUITE default) on
+  # the lecore-production runner and uploads the .deb packages to S3 (skip_s3 is
+  # unset, so the upload step runs).
+  schedule:
+    - cron: "0 23 * * *"
+
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: "Branch to build from (e.g. resolute-qcom-devel, resolute-qcom)"
+        required: true
+        default: "resolute-qcom-devel"
+        type: string
+      kernel_version:
+        description: "Version (e.g. 7.0.0-1006.8) - builds the exact Ubuntu-qcom-<version> tag. Empty = branch HEAD."
+        required: false
+        type: string
+      devel_prs:
+        description: "Space-separated PR numbers against resolute-qcom-devel to merge before building (e.g. 42 43)"
+        required: false
+        default: ""
+        type: string
+      dbgsym:
+        description: "Build the -dbgsym.ddeb debug symbol packages alongside the .deb packages."
+        required: false
+        default: true
+        type: boolean
+      flavours:
+        description: "ALL builds every flavour. Otherwise a space-separated list of flavour names (e.g. 'qcom', 'qcom qcom-rt'), no 'binary-' prefix."
+        required: false
+        default: "ALL"
+        type: string
+
+  workflow_call:
+    inputs:
+      suite:
+        description: "Branch to build from"
+        required: false
+        default: "resolute-qcom-devel"
+        type: string
+      kernel_version:
+        description: "Version tag to build. Empty = branch HEAD."
+        required: false
+        default: ""
+        type: string
+      devel_prs:
+        description: "Space-separated PR numbers against resolute-qcom-devel to merge before building"
+        required: false
+        default: ""
+        type: string
+      dbgsym:
+        description: "Build the -dbgsym.ddeb debug symbol packages alongside the .deb packages."
+        required: false
+        default: true
+        type: boolean
+      ref:
+        description: "Exact git ref to checkout. Overrides suite/kernel_version when set (used by premerge-pr.yml to build the PR merge ref)."
+        required: false
+        default: ""
+        type: string
+      skip_s3:
+        description: "Skip uploading built .deb packages to S3 (used by premerge-pr.yml for build-only checks)."
+        required: false
+        default: false
+        type: boolean
+      flavours:
+        description: "ALL builds every flavour. Otherwise a space-separated list of flavour names (e.g. 'qcom', 'qcom qcom-rt'), no 'binary-' prefix."
+        required: false
+        default: "ALL"
+        type: string
+      s3_prefix:
+        description: "S3 path prefix under pkg/ (e.g. 'premerge', 'temp'). Callers must pass this explicitly."
+        required: false
+        default: "temp"
+        type: string
+
+permissions:
+  contents: read    # checkout + tag ls-remote only; output goes to S3
+
+jobs:
+  # --------------------------------------------------------------------------
+  # Job: build
+  # --------------------------------------------------------------------------
+  build:
+    name: "Build"
+    # Runner is always lecore-production for this repo.
+    runs-on: ["self-hosted", "lecore-prd-u2404-arm64-xlrg-od-ephem"]
+    timeout-minutes: 360
+
+    env:
+      SUITE:   ${{ inputs.suite   || 'resolute-qcom-devel' }}
+      ARCH:    arm64
+      FLAVOURS: ${{ inputs.flavours || 'ALL' }}
+      DBGSYM:  ${{ github.event_name == 'schedule' && 'true' || (inputs.dbgsym && 'true' || 'false') }}
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Free up disk space
+      #    GitHub-hosted ubuntu-24.04-arm runners ship with ~14 GB free.
+      #    The kernel build needs ~20 GB; removing unused toolchains gives
+      #    enough headroom.
+      # -----------------------------------------------------------------------
+      - name: Free up runner disk space
+        run: |
+          echo "Disk before cleanup:"
+          df -h /
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost \
+            "$AGENT_TOOLSDIRECTORY" \
+            2>/dev/null || true
+          sudo apt-get clean
+          echo "Disk after cleanup:"
+          df -h /
+
+      # -----------------------------------------------------------------------
+      # 2. Extract org/repo for S3 upload path
+      # -----------------------------------------------------------------------
+      - name: Extract org and repo name
+        run: |
+          echo "ORG_NAME=${GITHUB_REPOSITORY%%/*}" >> "$GITHUB_ENV"
+          echo "REPO_NAME=${GITHUB_REPOSITORY#*/}"  >> "$GITHUB_ENV"
+
+      # -----------------------------------------------------------------------
+      # 2b. Derive base suite (for Docker image) and upstream tag prefix.
+      #     BASE_SUITE strips any custom suffix so the correct pkg-builder image
+      #     is used (resolute-qcom → resolute). UPSTREAM_PREFIX is the verbatim
+      #     Canonical tag prefix the source branch was mirrored with
+      #     (custom/qcom suites → Ubuntu-qcom; official suites → Ubuntu).
+      # -----------------------------------------------------------------------
+      - name: Derive base suite and tag prefix
+        run: |
+          BASE_SUITE=$(echo "${SUITE}" | cut -d'-' -f1)
+          echo "BASE_SUITE=${BASE_SUITE}" >> "$GITHUB_ENV"
+          if echo "${SUITE}" | grep -q '-'; then
+            echo "UPSTREAM_PREFIX=Ubuntu-qcom" >> "$GITHUB_ENV"
+          else
+            echo "UPSTREAM_PREFIX=Ubuntu" >> "$GITHUB_ENV"
+          fi
+          echo "Suite: ${SUITE}  →  Base suite: ${BASE_SUITE}"
+
+      # -----------------------------------------------------------------------
+      # 3. Validate kernel_version against existing tags (fail fast)
+      #    Must run BEFORE checkout so a bad version fails immediately with a
+      #    clear error rather than a cryptic git "ref not found" from checkout.
+      # -----------------------------------------------------------------------
+      - name: Validate kernel_version tag exists
+        if: inputs.kernel_version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KERNEL_VERSION: ${{ inputs.kernel_version }}
+        run: |
+          TAG="${UPSTREAM_PREFIX}-${KERNEL_VERSION}"
+          echo "Verifying tag '${TAG}' exists in repository..."
+
+          if git ls-remote --exit-code --tags \
+               "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" \
+               "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "✓ Tag '${TAG}' exists — proceeding with build"
+          else
+            echo "ERROR: Tag '${TAG}' does not exist in this repository." >&2
+            echo "" >&2
+            echo "The kernel_version input must match a version that has been" >&2
+            echo "synced to the ${SUITE} branch by fetch-source-pkg.yml." >&2
+            echo "" >&2
+            echo "Existing tags: https://github.com/${{ github.repository }}/tags" >&2
+            exit 1
+          fi
+
+      # -----------------------------------------------------------------------
+      # 4. Checkout the kernel source
+      #    - If kernel_version is provided: checkout the exact verbatim Canonical
+      #      tag <UPSTREAM_PREFIX>-<kernel_version> (e.g. Ubuntu-qcom-7.0.0-1006.8)
+      #      so the build uses the precise synced source.
+      #    - If kernel_version is empty: checkout the suite branch HEAD
+      #      (test/dev builds).
+      #    Note: actions/checkout checks out a ref of THIS repository
+      #    (pkg-linux-qcom-canonical). The resolute-qcom/noble/... branches of
+      #    this repo contain the full kernel source tree mirrored by
+      #    fetch-source-pkg.yml — they are not the main branch.
+      # -----------------------------------------------------------------------
+      - name: Checkout kernel source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref != '' && inputs.ref || (inputs.kernel_version != '' && format('{0}-{1}', env.UPSTREAM_PREFIX, inputs.kernel_version) || inputs.suite || 'resolute-qcom-devel') }}
+          path: kernel-src
+
+      # -----------------------------------------------------------------------
+      # 4b. Merge additional PRs against resolute-qcom-devel into the
+      #     checked-out source tree (engineering builds only).
+      #     Each PR number is validated as numeric before use. Conflicts abort
+      #     the build immediately with a clear error.
+      # -----------------------------------------------------------------------
+      - name: Merge devel PRs into source tree
+        if: inputs.devel_prs != ''
+        env:
+          DEVEL_PRS: ${{ inputs.devel_prs }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd kernel-src/
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name  "github-actions[bot]"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+
+          echo "PRs to merge: ${DEVEL_PRS}"
+          for pr in ${DEVEL_PRS}; do
+            [[ "${pr}" =~ ^[0-9]+$ ]] || {
+              echo "ERROR: invalid PR number '${pr}' -- must be numeric" >&2
+              exit 1
+            }
+
+            # Validate: the PR must exist, be open, and target the suite branch.
+            # A closed or wrong-base PR number would otherwise be merged silently.
+            info="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr}" \
+                      --jq '[.state, .base.ref] | @tsv')" || {
+              echo "ERROR: PR #${pr} not found in ${GITHUB_REPOSITORY}." >&2
+              exit 1
+            }
+            state="$(printf '%s' "${info}" | cut -f1)"
+            base="$(printf '%s'  "${info}" | cut -f2)"
+            [ "${state}" = "open" ] || {
+              echo "ERROR: PR #${pr} is '${state}' -- only open PRs can be merged." >&2
+              exit 1
+            }
+            [ "${base}" = "${SUITE}" ] || {
+              echo "ERROR: PR #${pr} targets '${base}', not '${SUITE}'." >&2
+              exit 1
+            }
+
+            echo "::group::Merging ${SUITE} PR #${pr}"
+            # The build checkout is shallow (depth 1), so the merge base with the
+            # PR is not present. Fetch the PR head and deepen BOTH histories until
+            # a merge base exists - PRs fork from a recent tip, so this stays a
+            # small fetch and never pulls the full ~1.43M-commit history.
+            git fetch --no-tags --depth=1 origin "refs/pull/${pr}/head:refs/pr/${pr}"
+            step=100; total=0; max=6400
+            until git merge-base HEAD "refs/pr/${pr}" >/dev/null 2>&1; do
+              if [ "${total}" -ge "${max}" ]; then
+                echo "ERROR: no common ancestor with PR #${pr} within ${max} commits." >&2
+                echo "Rebase the PR onto ${SUITE} and retry." >&2
+                exit 1
+              fi
+              echo "  deepening history by ${step} commits to find the merge base..."
+              git fetch --deepen="${step}" origin "refs/heads/${SUITE}" "refs/pull/${pr}/head"
+              total=$((total + step)); step=$((step * 2))
+            done
+
+            if ! git merge --no-ff --no-commit "refs/pr/${pr}"; then
+              echo "ERROR: merge conflict while merging PR #${pr}. Aborting." >&2
+              git merge --abort || true
+              exit 1
+            fi
+            if git diff --cached --quiet; then
+              echo "PR #${pr} already present in tree -- nothing to merge."
+              git merge --abort >/dev/null 2>&1 || true
+            else
+              git commit -m "Merged ${SUITE} PR #${pr}"
+              echo "PR #${pr} merged successfully."
+            fi
+            echo "::endgroup::"
+          done
+
+      # -----------------------------------------------------------------------
+      # 5. Checkout docker-pkg-build
+      # -----------------------------------------------------------------------
+      - name: Checkout docker-pkg-build
+        uses: actions/checkout@v6
+        with:
+          repository: qualcomm-linux/docker-pkg-build
+          ref: main
+          path: docker-pkg-build
+
+      # -----------------------------------------------------------------------
+      # 6. Build the base-suite-matched pkg-builder docker image.
+      #    Uses BASE_SUITE (e.g. resolute) not SUITE (e.g. resolute-qcom)
+      #    because pkg-builder images are tagged by Ubuntu distro name only.
+      # -----------------------------------------------------------------------
+      - name: Build docker image for suite (${{ inputs.suite || 'resolute-qcom' }})
+        run: |
+          ./docker-pkg-build/docker_deb_build.py --rebuild -d "${BASE_SUITE}"
+          docker image ls
+
+      # -----------------------------------------------------------------------
+      # 7. Build kernel packages inside the suite-matched container
+      #    The workspace is bind-mounted so output .deb files land on the host.
+      # -----------------------------------------------------------------------
+      - name: Build kernel packages (ghcr.io/qualcomm-linux/pkg-builder:${{ inputs.suite || 'resolute-qcom' }})
+        run: |
+          JOBS=$(nproc)
+          FLAVOURS_LC=$(echo "${FLAVOURS}" | tr '[:upper:]' '[:lower:]')
+          # binary-indep is always built alongside the selected flavours —
+          # linux-headers-* and linux-tools-* packages depend on it, so it
+          # can't be made optional here.
+          if [ "${FLAVOURS_LC}" = "all" ]; then
+            TARGET="binary"
+          else
+            TARGET="binary-indep"
+            for f in ${FLAVOURS_LC}; do
+              TARGET="${TARGET} binary-${f}"
+            done
+          fi
+
+          echo "Building: suite=${SUITE}  base_suite=${BASE_SUITE}  target=${TARGET}  arch=${ARCH}  jobs=${JOBS}"
+
+          # IMPORTANT: use single quotes for bash -c so the outer shell does NOT
+          # expand $(...) or ${VAR} before passing the string to docker.
+          # JOBS, TARGET, and WS are passed as -e env vars and expanded inside
+          # the container by the container's own bash.
+          docker run -i --privileged --rm \
+            -v "${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}" \
+            --workdir="${GITHUB_WORKSPACE}" \
+            -e JOBS="${JOBS}" \
+            -e TARGET="${TARGET}" \
+            -e WS="${GITHUB_WORKSPACE}" \
+            -e DBGSYM="${DBGSYM}" \
+            "ghcr.io/qualcomm-linux/pkg-builder:${BASE_SUITE}" \
+            bash -c '
+              set -euo pipefail
+
+              # Enable deb-src so apt-get build-dep can resolve build dependencies.
+              # pkg-builder:noble is Ubuntu 24.04 which uses DEB822 format.
+              sed -i "s/^Types: deb$/Types: deb deb-src/" /etc/apt/sources.list.d/ubuntu.sources
+              apt-get update -qq
+              apt-get build-dep -y linux
+
+              cd kernel-src/
+              echo "debian/debian.env: $(cat debian/debian.env 2>/dev/null || echo NOT FOUND)"
+              ls -la debian/rules && echo "debian/rules: OK" || { echo "debian/rules: NOT FOUND"; exit 1; }
+
+              # Heartbeat every 2 min — kernel build takes 60-90 min with minimal output
+              while true; do echo "[$(date -u +%H:%M:%S)] kernel build still running..."; sleep 120; done &
+              HEARTBEAT=$!
+
+              # Run the clean target to set up the full build environment before
+              # compilation. This is the standard Ubuntu kernel build setup path:
+              #   - runs debian/control as a dependency, generating
+              #     debian/canonical-certs.pem (required by certs/x509_certificate_list)
+              #     and debian/control
+              #   - creates debian/changelog → debian.master/changelog symlink
+              #     (required by dh_installchangelogs at the end of binary-generic)
+              #   - removes any stale build artifacts
+              #
+              # Use "fakeroot make -f debian/rules" rather than "fakeroot debian/rules":
+              # fakeroot is a shell script that execs the command via /bin/sh (dash);
+              # dash resolves the shebang (#!/usr/bin/make -f) and reports "not found"
+              # if make is not yet on PATH at exec time. Invoking make explicitly
+              # bypasses the shebang lookup entirely.
+              echo "=== Setting up build environment (debian/rules clean) ==="
+              fakeroot make -f debian/rules clean
+
+              # Safety net: ensure debian/changelog symlink exists.
+              # The clean target should create it as part of standard setup,
+              # but if it does not (container environment difference), the
+              # build would fail at dh_installchangelogs after 2+ hours.
+              # This guard is a no-op when clean already created the symlink.
+              if [ ! -f debian/changelog ] && [ -f debian.master/changelog ]; then
+                ln -sf ../debian.master/changelog debian/changelog
+                echo "Safety net: created debian/changelog → debian.master/changelog"
+              fi
+
+              echo "=== Starting: fakeroot debian/rules ${TARGET} (jobs=${JOBS}) ==="
+              export DEB_BUILD_OPTIONS="parallel=${JOBS} nocheck"
+              # do_skip_checks=true skips the config policy check that requires
+              # CONFIG_RUST_IS_AVAILABLE=y — bindgen-0.65 is not available in
+              # the container so Rust support is unavailable, causing the check
+              # to fail. This is the standard approach for non-official builds.
+              # do_dbgsym_package=true additionally builds the unstripped
+              # -dbgsym.ddeb (vmlinux + modules with full debug symbols).
+              DBGSYM_OPT="do_dbgsym_package=false"
+              if [ "${DBGSYM}" = "true" ]; then DBGSYM_OPT="do_dbgsym_package=true"; fi
+              fakeroot debian/rules ${TARGET} do_skip_checks=true "${DBGSYM_OPT}" do_fitimage=false
+
+              kill "${HEARTBEAT}" 2>/dev/null || true
+
+              echo "=== Locating built .deb files ==="
+              find "${WS}" -name "*.deb" -o -name "*.ddeb" | sort || true
+            '
+
+      # -----------------------------------------------------------------------
+      # 8. Collect output packages
+      #    The Ubuntu kernel build drops .deb files one level above the
+      #    source tree (i.e. in GITHUB_WORKSPACE, not inside kernel-src/).
+      #    qcom-rt flavour packages are split into output/rt/ so consumers can
+      #    tell the two flavours apart; qcom flavour packages stay in output/.
+      #    output/rt/ is only created on demand (when a qcom-rt artifact is
+      #    actually found below) so a build that didn't select qcom-rt
+      #    doesn't produce an empty/misleading rt directory.
+      #
+      #    linux-qcom-headers-* and linux-qcom-tools-* are "Architecture: all"
+      #    at the source level, so there is a single shared .deb per ABI
+      #    rather than one per flavour, and they land in output/ (they don't
+      #    match the -qcom-rt filename pattern above). linux-headers-*-qcom-rt
+      #    depends on linux-qcom-headers-*, and a future linux-tools-*-qcom-rt
+      #    would similarly depend on linux-qcom-tools-*, so both are also
+      #    copied (not moved — qcom needs its own copy in output/ too) into
+      #    output/rt/ to keep that folder self-contained — but again, only
+      #    if output/rt/ already exists (i.e. qcom-rt was actually built).
+      # -----------------------------------------------------------------------
+      - name: Collect built packages
+        run: |
+          mkdir -p output/
+
+          find "${GITHUB_WORKSPACE}" -maxdepth 1 \
+            \( -name "*.deb" -o -name "*.ddeb" -o -name "*.changes" -o -name "*.buildinfo" \) \
+            -print0 | while IFS= read -r -d '' f; do
+              case "$(basename "$f")" in
+                *-qcom-rt_*|*-qcom-rt-dbgsym_*) mkdir -p output/rt/; cp "$f" output/rt/ ;;
+                *)                              cp "$f" output/ ;;
+              esac
+            done
+
+          if [ -d output/rt ]; then
+            find output -maxdepth 1 \
+              \( -name "linux-qcom-headers-*" -o -name "linux-qcom-tools-*" \) \
+              -print0 | while IFS= read -r -d '' f; do
+                cp "$f" output/rt/
+              done
+          fi
+
+          echo "Built packages (qcom):"
+          ls -lh output/ 2>/dev/null | grep -v '^total\|^d' || echo "(no files found)"
+          if [ -d output/rt ]; then
+            echo "Built packages (qcom-rt):"
+            ls -lh output/rt/ || echo "(no files found)"
+          fi
+
+      # -----------------------------------------------------------------------
+      # 9. Upload to S3 (lecore-production runner only)
+      #    Skipped when skip_s3 is set (premerge-pr.yml build-only checks).
+      #    Destination prefix is the caller-supplied s3_prefix input, not
+      #    inferred from github.event_name: a reusable workflow inherits the
+      #    caller's original event, so it is never actually "workflow_call".
+      # -----------------------------------------------------------------------
+      - name: Upload kernel .deb packages to S3
+        if: inputs.skip_s3 != true
+        uses: qualcomm-linux/upload-private-artifact-action@aws-v4
+        with:
+          s3_bucket: qli-prd-lecore-gh-artifacts
+          path: ${{ github.workspace }}/output
+          destination: ${{ env.ORG_NAME }}/pkg/${{ inputs.s3_prefix || 'temp' }}/${{ env.REPO_NAME }}/${{ github.run_id }}-${{ github.run_attempt }}/
+
+      # -----------------------------------------------------------------------
+      # 10. Summary
+      # -----------------------------------------------------------------------
+      - name: Print summary
+        if: always()
+        env:
+          DEVEL_PRS: ${{ inputs.devel_prs }}
+          RUNNER_NAME: ${{ runner.name }}
+        run: |
+          {
+            echo "## Kernel Build Summary"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Branch       | \`${SUITE}\` |"
+            echo "| Architecture | \`${ARCH}\` |"
+            echo "| Flavour      | \`${FLAVOURS}\` |"
+            echo "| Dbgsym       | \`${DBGSYM}\` |"
+            echo "| Container    | \`ghcr.io/qualcomm-linux/pkg-builder:${BASE_SUITE}\` |"
+            echo "| Runner       | \`${RUNNER_NAME}\` |"
+            if [ -n "${DEVEL_PRS}" ]; then
+              echo "| Devel PRs    | \`${DEVEL_PRS}\` |"
+            fi
+            echo ""
+            echo "### Built packages (qcom)"
+            echo '```'
+            ls -lh output/ 2>/dev/null | grep -v '^total\|^d' || echo "(none)"
+            echo '```'
+            if [ -d output/rt ]; then
+              echo ""
+              echo "### Built packages (qcom-rt)"
+              echo '```'
+              ls -lh output/rt/
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
