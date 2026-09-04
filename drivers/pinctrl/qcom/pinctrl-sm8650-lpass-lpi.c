@@ -212,8 +212,8 @@ static const struct lpi_pinctrl_variant_data sm8650_lpi_data = {
 
 static const struct of_device_id lpi_pinctrl_of_match[] = {
 	{
-	       .compatible = "qcom,sm8650-lpass-lpi-pinctrl",
-	       .data = &sm8650_lpi_data,
+		.compatible = "qcom,sm8650-lpass-lpi-pinctrl",
+		.data = &sm8650_lpi_data,
 	},
 	{ }
 };
@@ -225,9 +225,9 @@ static const struct dev_pm_ops lpi_pinctrl_pm_ops = {
 
 static struct platform_driver lpi_pinctrl_driver = {
 	.driver = {
-			   .name = "qcom-sm8650-lpass-lpi-pinctrl",
-			   .of_match_table = lpi_pinctrl_of_match,
-			   .pm = pm_ptr(&lpi_pinctrl_pm_ops),
+		.name = "qcom-sm8650-lpass-lpi-pinctrl",
+		.of_match_table = lpi_pinctrl_of_match,
+		.pm = pm_ptr(&lpi_pinctrl_pm_ops),
 	},
 	.probe = lpi_pinctrl_probe,
 	.remove = lpi_pinctrl_remove,
