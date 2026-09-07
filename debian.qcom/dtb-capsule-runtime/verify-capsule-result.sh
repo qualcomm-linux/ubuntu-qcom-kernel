@@ -113,6 +113,13 @@ fi
 DTB_CAPSULE_EXPECTED_SHA=""
 [ -n "$DTB_CAPSULE_EXPECTED_KVER" ] && DTB_CAPSULE_EXPECTED_SHA="$(dtb_provenance_sha256_for_kver "$DTB_CAPSULE_EXPECTED_KVER" 2>/dev/null || echo "")"
 
+RECOVERY_TOOL="${RECOVERY_TOOL:-/usr/sbin/dtb-capsule-recovery}"
+# Best-effort GRUB default switch to a kernel matching the running DTB.
+run_auto_recovery() {
+    [ -x "$RECOVERY_TOOL" ] || return 0
+    "$RECOVERY_TOOL" --auto 2>&1 | while IFS= read -r _line; do log "$_line"; done
+}
+
 # dtb_kver_content_match: whether the running DTB's provenance sha256 matches
 # the linux-modules-<kver> package installed for RUNNING_KVER right now.
 RUNNING_DTB_MATCHES_INSTALLED_MODULES="unknown"
@@ -204,6 +211,7 @@ if [ -n "$DTB_CAPSULE_EXPECTED_KVER" ] && [ "$RUNNING_KVER" != "$DTB_CAPSULE_EXP
     if [ -d "$CAPSULE_DIR" ] && [ -n "$(ls -A "$CAPSULE_DIR" 2>/dev/null)" ]; then
         STALL_STATE="$(check_reboot_stall)"
         log "running kernel ${RUNNING_KVER} does not match capsule's expected kernel ${DTB_CAPSULE_EXPECTED_KVER}; ${CAPSULE_DIR} still holds an unconsumed capsule — ${STALL_STATE}"
+        [ "$STALL_STATE" = "reboot_stalled" ] && run_auto_recovery
         write_state "$STALL_STATE" "unknown" "expected-kver=${DTB_CAPSULE_EXPECTED_KVER} installed, capsule still unconsumed in ${CAPSULE_DIR}"
         exit 0
     fi
@@ -211,6 +219,7 @@ if [ -n "$DTB_CAPSULE_EXPECTED_KVER" ] && [ "$RUNNING_KVER" != "$DTB_CAPSULE_EXP
     if [ -n "$DTB_CAPSULE_EXPECTED_SHA" ] && [ "$DTB_CAPSULE_EXPECTED_SHA" = "$RUNNING_DTB_SHA" ]; then
         STALL_STATE="$(check_reboot_stall)"
         log "running kernel ${RUNNING_KVER} does not match capsule's expected kernel ${DTB_CAPSULE_EXPECTED_KVER}, but running DTB content already matches it (staging was skipped) — ${STALL_STATE}"
+        [ "$STALL_STATE" = "reboot_stalled" ] && run_auto_recovery
         write_state "$STALL_STATE" "unknown" "expected-kver=${DTB_CAPSULE_EXPECTED_KVER}, capsule staging was skipped (content already matched)"
         exit 0
     fi
@@ -225,6 +234,7 @@ if [ -n "$DTB_CAPSULE_EXPECTED_KVER" ] && [ "$RUNNING_KVER" != "$DTB_CAPSULE_EXP
             ;;
         mismatch)
             log "ERROR: running kernel ${RUNNING_KVER}'s own DTB content does not match its installed linux-modules package — kernel and DTB are paired incorrectly"
+            run_auto_recovery
             write_state "kernel_dtb_mismatch" "unknown" "expected-kver=${DTB_CAPSULE_EXPECTED_KVER}, running kver=${RUNNING_KVER}'s own DTB content mismatches its installed package"
             exit 0
             ;;
