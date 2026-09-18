@@ -42,6 +42,7 @@ Build-Depends:
  libunwind8-dev [amd64 arm64 armhf ppc64el] <!stage1>,
  llvm-21-dev,
  makedumpfile:native [amd64] <!stage1>,
+ mtools [arm64] <!stage1>,
  openssl <!stage1>,
  pahole (>= 1.29-2ubuntu2) [amd64 arm64 armhf ppc64el s390x riscv64] | dwarves (>= 1.21) [amd64 arm64 armhf ppc64el s390x riscv64] <!stage1>,
  pkg-config <!stage1>,
@@ -91,3 +92,19 @@ Description: Linux kernel version specific tools for version PKGVER-ABINUM
  version locked tools (such as perf and x86_energy_perf_policy) for
  version PKGVER-ABINUM.
  You probably want to install linux-tools-PKGVER-ABINUM-<flavour>.
+
+Package: dtb-capsule-PKGVER-ABINUM-qcom
+Build-Profiles: <!stage1>
+Architecture: arm64
+Section: admin
+Priority: optional
+Depends: ${misc:Depends}, linux-modules-PKGVER-ABINUM-qcom
+Recommends: grub2-common
+Provides: dtb-capsule-qcom
+Conflicts: dtb-capsule-qcom
+Replaces: dtb-capsule-qcom
+Description: DTB UEFI capsule update for version PKGVER
+ This package provides a UEFI capsule image and provenance manifest
+ for updating the Qualcomm device tree blob (DTB) staged for version
+ PKGVER, along with a systemd service that verifies the update result
+ on the next boot.
