@@ -68,6 +68,8 @@
 #define ADSP_MMAP_ADD_PAGES_LLC 0x3000,
 
 #define DSP_UNSUPPORTED_API (0x80000414)
+#define FASTRPC_DSP_ENOSUCHPROCESS (0x80000441)
+#define FASTRPC_DSP_EBADSTATE (0x8000040d)
 /* MAX NUMBER of DSP ATTRIBUTES SUPPORTED */
 #define FASTRPC_MAX_DSP_ATTRIBUTES (256)
 #define FASTRPC_MAX_DSP_ATTRIBUTES_LEN (sizeof(u32) * FASTRPC_MAX_DSP_ATTRIBUTES)
@@ -2135,6 +2137,10 @@ static int fastrpc_req_munmap_impl(struct fastrpc_user *fl, struct fastrpc_buf *
 	if (!err) {
 		dev_dbg(dev, "unmmap\tpt 0x%09lx OK\n", buf->raddr);
 		fastrpc_buf_free(buf);
+	} else if (err == FASTRPC_DSP_ENOSUCHPROCESS || err == FASTRPC_DSP_EBADSTATE) {
+		/* Expected when the DSP process is already gone; not an error. */
+		dev_dbg(dev, "unmmap\tpt 0x%09lx skipped, DSP process exiting\n",
+		buf->raddr);
 	} else {
 		dev_err(dev, "unmmap\tpt 0x%09lx ERROR\n", buf->raddr);
 	}
