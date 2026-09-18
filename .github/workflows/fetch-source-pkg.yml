@@ -1,0 +1,165 @@
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# fetch-source-pkg.yml
+#
+# Mirrors the latest Qualcomm-Ubuntu kernel upload from the carmel-team Launchpad
+# repository into the resolute-qcom branch (preserving full upstream history),
+# then triggers a kernel build.
+#
+# This repo mirrors exactly ONE source into ONE branch, so the workflow takes no
+# inputs -- everything is fixed:
+#   upstream : git.launchpad.net/~carmel-team/ubuntu/+source/linux/+git/resolute
+#   branch   : resolute-qcom
+#   tags     : Ubuntu-qcom-X.Y.Z-A.B  (mirrored verbatim from upstream)
+#
+# History-preserving "mirror-repoint" model
+#   * resolute-qcom is a movable "latest Canonical" pointer.
+#   * The upstream Ubuntu-qcom-X.Y.Z-A.B tag is mirrored verbatim as the immutable
+#     per-upload record.
+#   * A sync is pure fetch + repoint (scripts/sync-mirror.sh): it never merges or
+#     rebases, so it cannot conflict.
+#
+# Prerequisite: resolute-qcom must first be seeded with full history by the
+# "Bootstrap: Seed Canonical Kernel History" workflow. This job is incremental
+# and refuses to run against an un-seeded branch.
+
+name: "Sync: Canonical Kernel Sources to Branch"
+run-name: "Mirror latest Ubuntu-qcom upload into resolute-qcom"
+
+on:
+  workflow_dispatch:   # manual only; always mirrors the latest carmel-team upload
+
+permissions:
+  contents: read
+
+# Only one sync at a time -- a second run's lease-pinned push would be rejected.
+concurrency:
+  group: mirror-sync-resolute-qcom
+  cancel-in-progress: false
+
+env:
+  BRANCH:          resolute-qcom
+  UPSTREAM_URL:    "https://git.launchpad.net/~carmel-team/ubuntu/+source/linux/+git/resolute"
+  UPSTREAM_PREFIX: Ubuntu-qcom
+
+jobs:
+  # ==========================================================================
+  # Job 1 - cheap "is there a new upload?" gate (no clone).
+  # ==========================================================================
+  check-version:
+    name: "Check for new uploads"
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    outputs:
+      should_sync: ${{ steps.gate.outputs.should_sync }}
+    steps:
+      - name: Gate on un-mirrored uploads
+        id: gate
+        env:
+          MIRROR_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+        run: |
+          # Compare upstream upload tags against our mirrored tags via two cheap
+          # ls-remote calls (no clone). should_sync is true iff any upstream
+          # upload has no matching tag here. Capture ls-remote first so a transport
+          # failure is not mistaken for "upstream has no tags".
+          up_raw="$(git ls-remote --tags "${UPSTREAM_URL}" "refs/tags/${UPSTREAM_PREFIX}-*")" \
+            || { echo "::error::git ls-remote failed for upstream (network/auth?)"; exit 1; }
+          mapfile -t UP < <(
+            printf '%s\n' "${up_raw}" \
+              | grep -v '\^{}' | sed -E "s#.*refs/tags/${UPSTREAM_PREFIX}-##" | sort -V
+          )
+          [ "${#UP[@]}" -gt 0 ] || { echo "No ${UPSTREAM_PREFIX}-* tags upstream"; exit 1; }
+          LATEST="${UP[-1]}"
+
+          OURS="$(
+            git ls-remote --tags "${MIRROR_URL}" "refs/tags/${UPSTREAM_PREFIX}-*" \
+              | grep -v '\^{}' | sed -E "s#.*refs/tags/${UPSTREAM_PREFIX}-##" || true
+          )"
+
+          # -F: match the version as a fixed string (dots are not wildcards).
+          SHOULD_SYNC=false
+          for ver in "${UP[@]}"; do
+            if ! grep -qxF "${ver}" <<<"${OURS}"; then SHOULD_SYNC=true; break; fi
+          done
+
+          echo "should_sync=${SHOULD_SYNC}" >> "$GITHUB_OUTPUT"
+          echo "Latest upstream: ${LATEST}; new uploads to mirror: ${SHOULD_SYNC}"
+
+  # ==========================================================================
+  # Job 2 - mirror every new upload (history-preserving), via sync-mirror.sh.
+  # ==========================================================================
+  sync:
+    name: "Mirror"
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    needs: check-version
+    if: needs.check-version.outputs.should_sync == 'true'
+    permissions:
+      contents: write
+
+    outputs:
+      synced_version: ${{ steps.sync.outputs.synced_version }}
+      synced_count:   ${{ steps.sync.outputs.synced_count }}
+
+    steps:
+      - name: Free up runner disk space
+        run: |
+          sudo rm -rf \
+            /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost \
+            "$AGENT_TOOLSDIRECTORY" 2>/dev/null || true
+          sudo apt-get clean
+
+      - name: Checkout CI scripts
+        uses: actions/checkout@v6
+
+      # BRANCH, UPSTREAM_URL and UPSTREAM_PREFIX come from the workflow-level env
+      # above; sync-mirror.sh reads them directly.
+      - name: Mirror new uploads
+        id: sync
+        env:
+          MIRROR_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+          WORKDIR:    ${{ runner.temp }}/mirror-sync
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name  "github-actions[bot]"
+          bash scripts/sync-mirror.sh
+
+      - name: Print summary
+        if: always()
+        env:
+          SYNCED_COUNT: ${{ steps.sync.outputs.synced_count || 0 }}
+          SYNCED_VERSION: ${{ steps.sync.outputs.synced_version }}
+        run: |
+          {
+            echo "## Sync Summary"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Branch           | \`${BRANCH}\` |"
+            echo "| Uploads mirrored | ${SYNCED_COUNT} |"
+            echo "| Latest version   | \`${SYNCED_VERSION}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ==========================================================================
+  # Job 3 - trigger a kernel build for the newest mirrored upload.
+  # ==========================================================================
+  trigger-build:
+    name: "Trigger kernel build"
+    runs-on: ubuntu-24.04-arm
+    needs: [check-version, sync]
+    if: needs.sync.result == 'success' && needs.sync.outputs.synced_count != '0'
+    permissions:
+      actions: write
+
+    steps:
+      - name: Dispatch build-kernel workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION:  ${{ needs.sync.outputs.synced_version }}
+        run: |
+          echo "Building ${BRANCH} ${VERSION} (flavour qcom)"
+          gh workflow run build-kernel.yml \
+            --repo "${{ github.repository }}" \
+            --field suite="${BRANCH}" \
+            --field kernel_version="${VERSION}" 
