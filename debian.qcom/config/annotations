@@ -1106,7 +1106,7 @@ CONFIG_INTERCONNECT_QCOM_KAANAPALI              policy<{'arm64': 'y'}>
 CONFIG_INTERCONNECT_QCOM_QCS615                 policy<{'arm64': 'y'}>
 CONFIG_INTERCONNECT_QCOM_QCS8300                policy<{'arm64': 'y'}>
 CONFIG_INTERCONNECT_QCOM_SDM845                 policy<{'arm64': 'y'}>
-CONFIG_INTERCONNECT_QCOM_SHIKRA                 policy<{'arm64': 'm'}>
+CONFIG_INTERCONNECT_QCOM_SHIKRA                 policy<{'arm64': 'y'}>
 CONFIG_INTERCONNECT_QCOM_SM8450                 policy<{'arm64': 'y'}>
 CONFIG_INTERCONNECT_QCOM_SM8550                 policy<{'arm64': 'y'}>
 CONFIG_INTERCONNECT_QCOM_SM8650                 policy<{'arm64': 'y'}>
