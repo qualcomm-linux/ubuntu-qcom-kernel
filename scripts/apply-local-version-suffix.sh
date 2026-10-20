@@ -3,20 +3,21 @@
 # SPDX-License-Identifier: BSD-3-Clause
 #
 # Appends a local Debian version suffix (+qcom<N>.<sha>) to the topmost
-# debian/changelog entry for resolute-qcom-devel builds that carry commits
-# past the last Canonical sync tag, so the package version differs from a
-# plain rebuild of that tag. N is the commit count past the tag and sorts
-# numerically, so later builds always compare as newer. Skipped for
-# resolute-qcom mirror builds and kernel_version-pinned builds, which must
-# stay byte-identical to Canonical. Nothing here is ever committed to git.
+# debian/changelog entry for builds that carry commits past the last
+# Canonical sync tag, whatever branch they come from, so the package version
+# differs from a plain rebuild of that tag. N is the commit count past the tag
+# and sorts numerically, so later builds always compare as newer. Skipped for
+# kernel_version-pinned builds and for any build whose HEAD is exactly a
+# Canonical tag, such as the resolute-qcom mirror, which must stay
+# byte-identical to Canonical. Nothing here is ever committed to git.
 #
 # Uses the GitHub Compare API to find the nearest Ubuntu-qcom-* tag rather
 # than local git tags: the checkout is shallow, deepening history alone
 # doesn't fetch tags, and this repo's full tag namespace is too large to
 # fetch blindly on every build.
 #
-# Exits 0 when no suffix is needed (not a resolute-qcom-devel build, or HEAD
-# is exactly a sync tag) and 1 when a resolute-qcom-devel build cannot be
+# Exits 0 when no suffix is needed (a pinned kernel_version, or HEAD is
+# exactly a sync tag) and 1 when a build that needs one cannot be
 # versioned, so the calling workflow can withhold its packages rather than
 # publish them under the released version of the tag they sit on. Writes a
 # full replacement changelog to a temp file and swaps it in with mv at the
@@ -24,7 +25,6 @@
 # written.
 set -euo pipefail
 
-: "${SUITE:?SUITE is required}"
 : "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
 KERNEL_VERSION="${KERNEL_VERSION:-}"
 
@@ -38,8 +38,27 @@ fail() {
   exit 1
 }
 
-if [[ "$SUITE" != "resolute-qcom-devel" || -n "$KERNEL_VERSION" ]]; then
-  echo "Not a resolute-qcom-devel development build (suite=${SUITE}, kernel_version=${KERNEL_VERSION:-<empty>}); no local version suffix needed."
+if [[ -n "$KERNEL_VERSION" ]]; then
+  echo "kernel_version=${KERNEL_VERSION} builds an exact Canonical tag; no local version suffix needed."
+  emit_kernel_version "unmodified"
+  exit 0
+fi
+
+cd kernel-src/
+
+HEAD_SHA="$(git rev-parse HEAD)"
+SHORT_SHA="$(git rev-parse --short=12 HEAD)"
+
+if [[ ! "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || [[ ! "$SHORT_SHA" =~ ^[0-9a-f]{12}$ ]]; then
+  fail "Unexpected HEAD SHA format; cannot apply the local version suffix."
+fi
+
+# A build of an exact Canonical tag, such as the resolute-qcom mirror, needs no
+# suffix. Check with git first so those builds never depend on the GitHub API;
+# if ls-remote fails, the API lookup below reaches the same answer.
+if TAG_REFS="$(git ls-remote --tags origin 'refs/tags/Ubuntu-qcom-*' 2>/dev/null)" &&
+   awk -v head="$HEAD_SHA" '$1 == head { found = 1 } END { exit !found }' <<< "$TAG_REFS"; then
+  echo "HEAD ${HEAD_SHA} is exactly a Canonical Ubuntu-qcom-* tag; no local version suffix needed."
   emit_kernel_version "unmodified"
   exit 0
 fi
@@ -57,8 +76,6 @@ if (( ${#MISSING_TOOLS[@]} > 0 )); then
   fail "Missing required tool(s) on the runner: ${MISSING_TOOLS[*]}; cannot apply the local version suffix."
 fi
 
-cd kernel-src/
-
 DEBIAN_DIR="$(awk -F= '($1 == "DEBIAN") { print $2 }' debian/debian.env 2>/dev/null || true)"
 if [[ -z "$DEBIAN_DIR" ]]; then
   fail "Could not resolve DEBIAN directory from debian/debian.env; cannot apply the local version suffix."
@@ -67,13 +84,6 @@ fi
 CHANGELOG="${DEBIAN_DIR}/changelog"
 if [[ ! -f "$CHANGELOG" ]]; then
   fail "${CHANGELOG} not found; cannot apply the local version suffix."
-fi
-
-HEAD_SHA="$(git rev-parse HEAD)"
-SHORT_SHA="$(git rev-parse --short=12 HEAD)"
-
-if [[ ! "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || [[ ! "$SHORT_SHA" =~ ^[0-9a-f]{12}$ ]]; then
-  fail "Unexpected HEAD SHA format; cannot apply the local version suffix."
 fi
 
 if ! TAGS_RAW="$(

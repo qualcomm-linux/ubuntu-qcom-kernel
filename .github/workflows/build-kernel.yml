@@ -304,10 +304,11 @@ jobs:
           echo "Series: ${series} (from ${changelog})"
 
       # -----------------------------------------------------------------------
-      # 4c. Local version suffix for resolute-qcom-devel builds with commits
-      #     past the last Canonical sync tag, so they're distinguishable from
-      #     a plain rebuild of that tag. Skipped for resolute-qcom mirror and
-      #     kernel_version-pinned builds. Never fails the kernel build itself.
+      # 4c. Local version suffix for any build with commits past the last
+      #     Canonical sync tag, so it's distinguishable from a plain rebuild of
+      #     that tag. Skipped for kernel_version-pinned builds and for any
+      #     build whose HEAD is exactly a Canonical tag, such as the
+      #     resolute-qcom mirror. Never fails the kernel build itself.
       #
       #     Checked out at main by default: CI scripts must come from the
       #     trusted default branch, not whatever ref is being built. Matters
