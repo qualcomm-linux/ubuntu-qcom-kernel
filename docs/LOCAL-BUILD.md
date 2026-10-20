@@ -29,8 +29,8 @@ git clone --depth 1 -b resolute-qcom-devel \
   https://github.com/qualcomm-linux/ubuntu-qcom-kernel.git kernel-src
 ```
 
-Build the builder image. It is tagged by base suite, so both `resolute-qcom`
-and `resolute-qcom-devel` use `resolute`:
+Build the builder image. It is tagged by the Ubuntu series in
+`debian.qcom/changelog`, which is `resolute` for every branch today:
 
 ```bash
 git clone https://github.com/qualcomm-linux/docker-pkg-build.git

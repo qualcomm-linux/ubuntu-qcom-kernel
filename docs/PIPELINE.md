@@ -50,8 +50,9 @@ The maintenance workflows below are manual (`Actions → … → Run workflow`, 
 gh workflow run fetch-source-pkg.yml --repo qualcomm-linux/ubuntu-qcom-kernel
 
 # Build .deb packages. Defaults to resolute-qcom-devel HEAD; set the suite input to
-# resolute-qcom for the mirror, or kernel_version for an exact tag. The dbgsym
-# input (default true) also builds the unstripped -dbgsym.ddeb.
+# resolute-qcom for the mirror or to any branch based on either, or kernel_version
+# for an exact tag. The dbgsym input (default true) also builds the unstripped
+# -dbgsym.ddeb.
 gh workflow run build-kernel.yml --repo qualcomm-linux/ubuntu-qcom-kernel
 
 # One-time only, before the first sync: seed resolute-qcom with history (into

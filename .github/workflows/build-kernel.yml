@@ -2,12 +2,13 @@
 #
 # build-kernel.yml
 #
-# Builds Ubuntu kernel .deb packages from a branch
-# (e.g. "noble", "resolute-qcom") that was populated by fetch-source-pkg.yml.
+# Builds Ubuntu kernel .deb packages from resolute-qcom-devel, the
+# resolute-qcom mirror populated by fetch-source-pkg.yml, or any branch based
+# on them.
 #
-# The build always runs inside the base-suite-matched
-# ghcr.io/qualcomm-linux/pkg-builder:<base_suite> container via
-# docker-pkg-build, ensuring a clean, reproducible environment
+# The build always runs inside the ghcr.io/qualcomm-linux/pkg-builder:<series>
+# container via docker-pkg-build, where <series> is the Ubuntu series the
+# source's changelog declares, ensuring a clean, reproducible environment
 # that exactly matches the target distro.
 #
 # Output .deb packages are uploaded ONLY to the S3 bucket
@@ -27,7 +28,7 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Branch to build from (e.g. resolute-qcom-devel, resolute-qcom)"
+        description: "Branch to build: resolute-qcom-devel, resolute-qcom, or any branch based on them"
         required: true
         default: "resolute-qcom-devel"
         type: string
@@ -114,6 +115,8 @@ jobs:
 
     env:
       SUITE:   ${{ inputs.suite   || 'resolute-qcom-devel' }}
+      # Every upload this repository mirrors is tagged Ubuntu-qcom-<version>.
+      UPSTREAM_PREFIX: Ubuntu-qcom
       ARCH:    arm64
       FLAVOURS: ${{ inputs.flavours || 'ALL' }}
       DBGSYM:  ${{ github.event_name == 'schedule' && 'true' || (inputs.dbgsym && 'true' || 'false') }}
@@ -150,24 +153,6 @@ jobs:
           echo "REPO_NAME=${GITHUB_REPOSITORY#*/}"  >> "$GITHUB_ENV"
 
       # -----------------------------------------------------------------------
-      # 2b. Derive base suite (for Docker image) and upstream tag prefix.
-      #     BASE_SUITE strips any custom suffix so the correct pkg-builder image
-      #     is used (resolute-qcom → resolute). UPSTREAM_PREFIX is the verbatim
-      #     Canonical tag prefix the source branch was mirrored with
-      #     (custom/qcom suites → Ubuntu-qcom; official suites → Ubuntu).
-      # -----------------------------------------------------------------------
-      - name: Derive base suite and tag prefix
-        run: |
-          BASE_SUITE=$(echo "${SUITE}" | cut -d'-' -f1)
-          echo "BASE_SUITE=${BASE_SUITE}" >> "$GITHUB_ENV"
-          if echo "${SUITE}" | grep -q '-'; then
-            echo "UPSTREAM_PREFIX=Ubuntu-qcom" >> "$GITHUB_ENV"
-          else
-            echo "UPSTREAM_PREFIX=Ubuntu" >> "$GITHUB_ENV"
-          fi
-          echo "Suite: ${SUITE}  →  Base suite: ${BASE_SUITE}"
-
-      # -----------------------------------------------------------------------
       # 3. Validate kernel_version against existing tags (fail fast)
       #    Must run BEFORE checkout so a bad version fails immediately with a
       #    clear error rather than a cryptic git "ref not found" from checkout.
@@ -189,7 +174,7 @@ jobs:
             echo "ERROR: Tag '${TAG}' does not exist in this repository." >&2
             echo "" >&2
             echo "The kernel_version input must match a version that has been" >&2
-            echo "synced to the ${SUITE} branch by fetch-source-pkg.yml." >&2
+            echo "synced by fetch-source-pkg.yml." >&2
             echo "" >&2
             echo "Existing tags: https://github.com/${{ github.repository }}/tags" >&2
             exit 1
@@ -203,8 +188,8 @@ jobs:
       #    - If kernel_version is empty: checkout the suite branch HEAD
       #      (test/dev builds).
       #    Note: actions/checkout checks out a ref of THIS repository
-      #    (ubuntu-qcom-kernel). The resolute-qcom/noble/... branches of
-      #    this repo contain the full kernel source tree mirrored by
+      #    (ubuntu-qcom-kernel). The resolute-qcom* branches of this repo
+      #    contain the full kernel source tree mirrored by
       #    fetch-source-pkg.yml; they are not the main branch.
       # -----------------------------------------------------------------------
       - name: Checkout kernel source
@@ -290,6 +275,35 @@ jobs:
           done
 
       # -----------------------------------------------------------------------
+      # 4b2. Resolve the Ubuntu series the source targets, which selects the
+      #      pkg-builder image. Read from the changelog the same way Canonical's
+      #      packaging reads it (debian/rules.d/0-common-vars.mk), skipping an
+      #      UNRELEASED entry still being prepared, so any branch builds in the
+      #      image for its release whatever the branch is named.
+      # -----------------------------------------------------------------------
+      - name: Resolve Ubuntu series
+        working-directory: kernel-src
+        run: |
+          set -euo pipefail
+          debian_dir="$(sed -n 's/^DEBIAN=//p' debian/debian.env 2>/dev/null || true)"
+          changelog="${debian_dir}/changelog"
+          if [ -z "${debian_dir}" ] || [ ! -f "${changelog}" ]; then
+            echo "::error::The checked-out source is not an Ubuntu kernel tree: no changelog found through debian/debian.env."
+            exit 1
+          fi
+          series="$(awk '/^[^ ]+ \([^)]+\) / {
+                           d = $3; sub(/;.*/, "", d)
+                           sub(/-(security|updates|proposed)$/, "", d)
+                           if (d != "UNRELEASED") { print d; exit }
+                         }' "${changelog}")"
+          if ! [[ "${series}" =~ ^[a-z]+$ ]]; then
+            echo "::error::Could not read an Ubuntu series from ${changelog}."
+            exit 1
+          fi
+          echo "SERIES=${series}" >> "$GITHUB_ENV"
+          echo "Series: ${series} (from ${changelog})"
+
+      # -----------------------------------------------------------------------
       # 4c. Local version suffix for resolute-qcom-devel builds with commits
       #     past the last Canonical sync tag, so they're distinguishable from
       #     a plain rebuild of that tag. Skipped for resolute-qcom mirror and
@@ -343,20 +357,19 @@ jobs:
           persist-credentials: false
 
       # -----------------------------------------------------------------------
-      # 6. Build the base-suite-matched pkg-builder docker image.
-      #    Uses BASE_SUITE (e.g. resolute) not SUITE (e.g. resolute-qcom)
-      #    because pkg-builder images are tagged by Ubuntu distro name only.
+      # 6. Build the pkg-builder docker image for the source's Ubuntu series.
+      #    pkg-builder images are tagged by series only (e.g. resolute).
       # -----------------------------------------------------------------------
-      - name: Build docker image for suite (${{ inputs.suite || 'resolute-qcom' }})
+      - name: Build docker image (pkg-builder:${{ env.SERIES }})
         run: |
-          ./docker-pkg-build/docker_deb_build.py --rebuild -d "${BASE_SUITE}"
+          ./docker-pkg-build/docker_deb_build.py --rebuild -d "${SERIES}"
           docker image ls
 
       # -----------------------------------------------------------------------
-      # 7. Build kernel packages inside the suite-matched container
+      # 7. Build kernel packages inside the series-matched container
       #    The workspace is bind-mounted so output .deb files land on the host.
       # -----------------------------------------------------------------------
-      - name: Build kernel packages (ghcr.io/qualcomm-linux/pkg-builder:${{ inputs.suite || 'resolute-qcom' }})
+      - name: Build kernel packages (pkg-builder:${{ env.SERIES }})
         run: |
           JOBS=$(nproc)
           FLAVOURS_LC=$(echo "${FLAVOURS}" | tr '[:upper:]' '[:lower:]')
@@ -372,7 +385,7 @@ jobs:
             done
           fi
 
-          echo "Building: suite=${SUITE}  base_suite=${BASE_SUITE}  target=${RULES_TARGETS}  arch=${ARCH}  jobs=${JOBS}"
+          echo "Building: suite=${SUITE}  series=${SERIES}  target=${RULES_TARGETS}  arch=${ARCH}  jobs=${JOBS}"
 
           # IMPORTANT: use single quotes for bash -c so the outer shell does NOT
           # expand $(...) or ${VAR} before passing the string to docker.
@@ -387,7 +400,7 @@ jobs:
             -e RULES_TARGETS="${RULES_TARGETS}" \
             -e WS="${GITHUB_WORKSPACE}" \
             -e DBGSYM="${DBGSYM}" \
-            "ghcr.io/qualcomm-linux/pkg-builder:${BASE_SUITE}" \
+            "ghcr.io/qualcomm-linux/pkg-builder:${SERIES}" \
             bash -c '
               set -euo pipefail
 
@@ -539,7 +552,7 @@ jobs:
             echo "| Flavour      | \`${FLAVOURS}\` |"
             echo "| Dbgsym       | \`${DBGSYM}\` |"
             echo "| Kernel version | \`${KERNEL_LOCAL_VERSION:-unmodified}\` |"
-            echo "| Container    | \`ghcr.io/qualcomm-linux/pkg-builder:${BASE_SUITE}\` |"
+            echo "| Container    | \`ghcr.io/qualcomm-linux/pkg-builder:${SERIES:-unresolved}\` |"
             echo "| Runner       | \`${RUNNER_NAME}\` |"
             if [ -n "${DEVEL_PRS}" ]; then
               echo "| Devel PRs    | \`${DEVEL_PRS}\` |"
