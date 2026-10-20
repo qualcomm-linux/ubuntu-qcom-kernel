@@ -65,7 +65,9 @@ that branch), which calls `build-kernel.yml` with `flavours=qcom`,
 `dbgsym=false`, and `s3_prefix=premerge` (binary-indep is always built
 regardless of `flavours`). Its packages are uploaded to S3 under
 `pkg/premerge/`, separate from the `pkg/temp/` prefix used by nightly and
-manual `workflow_dispatch` runs.
+manual `workflow_dispatch` runs. To build several PRs together, combine them on
+one branch in your fork and open a draft PR into `resolute-qcom-devel`; its
+pre-merge check builds the combination.
 
 PRs into `main` that change `.github/workflows/` or `scripts/` get their own
 build check (`premerge-main.yml`). It builds `resolute-qcom-devel` with the

@@ -36,11 +36,6 @@ on:
         description: "Version (e.g. 7.0.0-1006.8) - builds the exact Ubuntu-qcom-<version> tag. Empty = branch HEAD."
         required: false
         type: string
-      devel_prs:
-        description: "Space-separated PR numbers against resolute-qcom-devel to merge before building (e.g. 42 43)"
-        required: false
-        default: ""
-        type: string
       dbgsym:
         description: "Build the -dbgsym.ddeb debug symbol packages alongside the .deb packages."
         required: false
@@ -61,11 +56,6 @@ on:
         type: string
       kernel_version:
         description: "Version tag to build. Empty = branch HEAD."
-        required: false
-        default: ""
-        type: string
-      devel_prs:
-        description: "Space-separated PR numbers against resolute-qcom-devel to merge before building"
         required: false
         default: ""
         type: string
@@ -200,86 +190,11 @@ jobs:
           persist-credentials: false
 
       # -----------------------------------------------------------------------
-      # 4b. Merge additional PRs against resolute-qcom-devel into the
-      #     checked-out source tree (engineering builds only).
-      #     Each PR number is validated as numeric before use. Conflicts abort
-      #     the build immediately with a clear error.
-      # -----------------------------------------------------------------------
-      - name: Merge devel PRs into source tree
-        if: inputs.devel_prs != ''
-        env:
-          DEVEL_PRS: ${{ inputs.devel_prs }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          cd kernel-src/
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name  "github-actions[bot]"
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
-
-          echo "PRs to merge: ${DEVEL_PRS}"
-          for pr in ${DEVEL_PRS}; do
-            [[ "${pr}" =~ ^[0-9]+$ ]] || {
-              echo "ERROR: invalid PR number '${pr}' -- must be numeric" >&2
-              exit 1
-            }
-
-            # Validate: the PR must exist, be open, and target the suite branch.
-            # A closed or wrong-base PR number would otherwise be merged silently.
-            info="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr}" \
-                      --jq '[.state, .base.ref] | @tsv')" || {
-              echo "ERROR: PR #${pr} not found in ${GITHUB_REPOSITORY}." >&2
-              exit 1
-            }
-            state="$(printf '%s' "${info}" | cut -f1)"
-            base="$(printf '%s'  "${info}" | cut -f2)"
-            [ "${state}" = "open" ] || {
-              echo "ERROR: PR #${pr} is '${state}' -- only open PRs can be merged." >&2
-              exit 1
-            }
-            [ "${base}" = "${SUITE}" ] || {
-              echo "ERROR: PR #${pr} targets '${base}', not '${SUITE}'." >&2
-              exit 1
-            }
-
-            echo "::group::Merging ${SUITE} PR #${pr}"
-            # The build checkout is shallow (depth 1), so the merge base with the
-            # PR is not present. Fetch the PR head and deepen BOTH histories until
-            # a merge base exists - PRs fork from a recent tip, so this stays a
-            # small fetch and never pulls the full ~1.43M-commit history.
-            git fetch --no-tags --depth=1 origin "refs/pull/${pr}/head:refs/pr/${pr}"
-            step=100; total=0; max=6400
-            until git merge-base HEAD "refs/pr/${pr}" >/dev/null 2>&1; do
-              if [ "${total}" -ge "${max}" ]; then
-                echo "ERROR: no common ancestor with PR #${pr} within ${max} commits." >&2
-                echo "Rebase the PR onto ${SUITE} and retry." >&2
-                exit 1
-              fi
-              echo "  deepening history by ${step} commits to find the merge base..."
-              git fetch --deepen="${step}" origin "refs/heads/${SUITE}" "refs/pull/${pr}/head"
-              total=$((total + step)); step=$((step * 2))
-            done
-
-            if ! git merge --no-ff --no-commit "refs/pr/${pr}"; then
-              echo "ERROR: merge conflict while merging PR #${pr}. Aborting." >&2
-              git merge --abort || true
-              exit 1
-            fi
-            if git diff --cached --quiet; then
-              echo "PR #${pr} already present in tree -- nothing to merge."
-              git merge --abort >/dev/null 2>&1 || true
-            else
-              git commit -m "Merged ${SUITE} PR #${pr}"
-              echo "PR #${pr} merged successfully."
-            fi
-            echo "::endgroup::"
-          done
-
-      # -----------------------------------------------------------------------
-      # 4b2. Resolve the Ubuntu series the source targets, which selects the
-      #      pkg-builder image. Read from the changelog the same way Canonical's
-      #      packaging reads it (debian/rules.d/0-common-vars.mk), skipping an
-      #      UNRELEASED entry still being prepared, so any branch builds in the
-      #      image for its release whatever the branch is named.
+      # 4b. Resolve the Ubuntu series the source targets, which selects the
+      #     pkg-builder image. Read from the changelog the same way Canonical's
+      #     packaging reads it (debian/rules.d/0-common-vars.mk), skipping an
+      #     UNRELEASED entry still being prepared, so any branch builds in the
+      #     image for its release whatever the branch is named.
       # -----------------------------------------------------------------------
       - name: Resolve Ubuntu series
         working-directory: kernel-src
@@ -540,7 +455,6 @@ jobs:
       - name: Print summary
         if: always()
         env:
-          DEVEL_PRS: ${{ inputs.devel_prs }}
           RUNNER_NAME: ${{ runner.name }}
         run: |
           {
@@ -555,9 +469,6 @@ jobs:
             echo "| Kernel version | \`${KERNEL_LOCAL_VERSION:-unmodified}\` |"
             echo "| Container    | \`ghcr.io/qualcomm-linux/pkg-builder:${SERIES:-unresolved}\` |"
             echo "| Runner       | \`${RUNNER_NAME}\` |"
-            if [ -n "${DEVEL_PRS}" ]; then
-              echo "| Devel PRs    | \`${DEVEL_PRS}\` |"
-            fi
             echo ""
             echo "### Built packages (qcom)"
             echo '```'
