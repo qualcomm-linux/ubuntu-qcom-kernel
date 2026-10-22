@@ -34,3 +34,4 @@ with Qualcomm contributions.
 | Scope | License |
 |-------|---------|
 | Workflows, scripts, and documentation on `main` | BSD 3-Clause - see **[LICENSE.txt](LICENSE.txt)** |
+
