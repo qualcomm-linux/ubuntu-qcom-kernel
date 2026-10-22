@@ -337,7 +337,7 @@ static int qnap_mcu_hwmon_probe(struct platform_device *pdev)
 	 * levels and only succeed with either no or correct cooling levels.
 	 */
 	if (IS_ENABLED(CONFIG_THERMAL) && hwm->fan_cooling_levels) {
-		cdev = devm_thermal_of_cooling_device_register(dev,
+		cdev = devm_thermal_of_child_cooling_device_register(dev,
 					to_of_node(hwm->fan_node), "qnap-mcu-hwmon",
 					hwm, &qnap_mcu_hwmon_cooling_ops);
 		if (IS_ERR(cdev))
