@@ -1,0 +1,12 @@
+# Reviewers requested automatically on pull requests into
+# resolute-qcom-devel. Owners need a maintainer role on this repository,
+# otherwise GitHub ignores them.
+#
+# Carry this file over every time resolute-qcom-devel is rebased onto a
+# new resolute-qcom tag; without it, reviewers are no longer requested.
+
+*                @bjordiscollaku @quic-tingweiz
+/.github/        @bjordiscollaku
+/debian/         @bjordiscollaku
+/debian.qcom/    @bjordiscollaku
+/debian.master/  @bjordiscollaku
