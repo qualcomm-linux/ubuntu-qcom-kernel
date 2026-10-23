@@ -224,6 +224,15 @@
 		};
 	};
 
+       vdd_micro_usb_vbus: regulator-micro-usb-vbus {
+               compatible = "regulator-fixed";
+               regulator-name = "MICRO_USB_VBUS";
+               gpio = <&tlmm 63 GPIO_ACTIVE_HIGH>;
+               regulator-min-microvolt = <5000000>;
+               regulator-max-microvolt = <5000000>;
+               regulator-boot-on;
+       };
+
 	vph_pwr: regulator-vph-pwr {
 		compatible = "regulator-fixed";
 		regulator-name = "vph_pwr";
@@ -269,6 +278,40 @@
 		};
 	};
 
+	vreg_pcie0_1p05: regulator-pcie0-1p05v {
+		compatible = "regulator-fixed";
+		regulator-name = "PCIE0_1.05V";
+		gpio = <&pm7250b_gpios 4 GPIO_ACTIVE_HIGH>;
+		regulator-min-microvolt = <1050000>;
+		regulator-max-microvolt = <1050000>;
+		enable-active-high;
+		pinctrl-0 = <&upd_pwr_en2_state>;
+		pinctrl-names = "default";
+	};
+
+	vreg_pcie0_3p3: regulator-pcie0-3p3v-dual {
+		compatible = "regulator-fixed";
+		regulator-name = "PCIE0_3.3V_Dual";
+		gpio = <&pm7250b_gpios 1 GPIO_ACTIVE_HIGH>;
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		enable-active-high;
+		pinctrl-0 = <&upd_pwr_en1_state>;
+		pinctrl-names = "default";
+	};
+
+	upd_rest_vreg: upd_rest_vreg {
+		compatible = "regulator-fixed";
+		regulator-name = "upd_rest_vreg";
+		gpio = <&pm8350c_gpios 4 0>;
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		enable-active-high;
+		regulator-always-on;
+		pinctrl-0 = <&upd_hub_rst_state>;
+		pinctrl-names = "default";
+	};
+
 	vdd_ntn_0p9: regulator-vdd-ntn-0p9 {
 		compatible = "regulator-fixed";
 		regulator-name = "VDD_NTN_0P9";
@@ -292,6 +335,31 @@
 		pinctrl-names = "default";
 		regulator-enable-ramp-delay = <10000>;
 	};
+
+       usb2-connector {
+               compatible = "gpio-usb-b-connector",
+                            "usb-b-connector";
+                       label = "micro-USB";
+                       type = "micro";
+                       id-gpios = <&tlmm 61 GPIO_ACTIVE_HIGH>;
+                       vbus-gpios = <&pm7325_gpios 9 GPIO_ACTIVE_HIGH>;
+                       vbus-supply = <&vdd_micro_usb_vbus>;
+                       pinctrl-0 = <&usb2_id_detect>;
+                       pinctrl-names = "default";
+
+                       ports {
+                               #address-cells = <1>;
+                               #size-cells = <0>;
+
+                               port@0 {
+                                       reg = <0>;
+
+                                       usb2_connector_ep: endpoint {
+                                               remote-endpoint = <&usb2_controller_ep>;
+                                       };
+                               };
+                       };
+       };
 
 	wcn6750-pmu {
 		compatible = "qcom,wcn6750-pmu";
@@ -756,6 +824,72 @@
 			};
 		};
 	};
+
+	i2c-mux@71 {
+		compatible = "nxp,pca9847";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x71>;
+
+		i2c@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			reg = <1>;
+
+			usb-hub@2d {
+				compatible = "smsc,usb4604";
+				reg = <0x2d>;
+			};
+		};
+
+		i2c@2 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			reg = <2>;
+
+			usb-hub@2d {
+				compatible = "smsc,usb4604";
+				reg = <0x2d>;
+			};
+		};
+
+		i2c@3 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			reg = <3>;
+		};
+
+		i2c@4 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			reg = <4>;
+		};
+
+		i2c@5 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			reg = <5>;
+		};
+
+		i2c@6 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			reg = <6>;
+		};
+
+		i2c@7 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			reg = <7>;
+		};
+	};
 };
 
 &lpass_va_macro {
@@ -878,6 +1012,39 @@
 			device_type = "pci";
 			ranges;
 			bus-range = <0x4 0xff>;
+
+			/* Renesas μPD720201 PCIe USB3.0 Host Controller */
+			usb-controller@0,0 {
+				compatible = "pci1912,0014";
+				reg = <0x40000 0x0 0x0 0x0 0x0>;
+
+				avdd33-supply = <&upd_rest_vreg>;
+				vdd10-supply = <&vreg_pcie0_1p05>;
+				vdd33-supply = <&vreg_pcie0_3p3>;
+
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				/* Genesys Logic GL3590 USB Hub Controller */
+				gl3590_2_0: hub@1 {
+					compatible = "usb5e3,610";
+					reg = <1>;
+
+					reset-gpios = <&tlmm 162 GPIO_ACTIVE_HIGH>;
+
+					pinctrl-0 = <&usb_hub_reset_state>;
+					pinctrl-names = "default";
+
+					peer-hub = <&gl3590_3_0>;
+				};
+
+				gl3590_3_0: hub@2 {
+					compatible = "usb5e3,625";
+					reg = <2>;
+
+					peer-hub = <&gl3590_2_0>;
+				};
+			};
 		};
 
 		pcie@3,0 {
@@ -1262,6 +1429,17 @@
 		power-source = <0>;
 	};
 
+	upd_hub_rst_state: upd-hub-rst-state {
+		pins = "gpio4";
+		function = "normal";
+
+		bias-disable;
+		input-disable;
+		output-enable;
+		output-high;
+		power-source = <0>;
+	};
+
 	tc9563_resx_n: tc9563-resx-state {
 		pins = "gpio1";
 		function = "normal";
@@ -1329,6 +1507,12 @@
 		 */
 		bias-pull-up;
 	};
+
+       usb2_id_detect: usb2-id-detect-state {
+               pins = "gpio61";
+               function = "gpio";
+               bias-pull-up;
+       };
 };
 
 &uart5 {
@@ -1393,6 +1577,32 @@
 	status = "okay";
 };
 
+&usb_2 {
+	dr_mode = "otg";
+	status = "okay";
+
+	ports {
+               #address-cells = <1>;
+               #size-cells = <0>;
+
+               port@0 {
+                       reg = <0>;
+
+                       usb2_controller_ep: endpoint {
+                               remote-endpoint = <&usb2_connector_ep>;
+                       };
+               };
+       };
+};
+
+&usb_2_hsphy {
+       vdda-pll-supply = <&vreg_l10c_0p88>;
+       vdda18-supply = <&vreg_l1c_1p8>;
+       vdda33-supply = <&vreg_l2b_3p072>;
+
+       status = "okay";
+};
+
 &usb_dp_qmpphy_out {
 	remote-endpoint = <&redriver_phy_con_ss>;
 };
@@ -1442,11 +1652,29 @@
 };
 
 &pm7250b_gpios {
+	upd_pwr_en1_state: upd-pwr-en1-state {
+		pins = "gpio1";
+		function = "normal";
+
+		output-enable;
+		input-disable;
+		power-source = <0>;
+	};
+
 	lt9611_rst_pin: lt9611-rst-state {
 		pins = "gpio2";
 		function = "normal";
 
 		output-high;
+		input-disable;
+		power-source = <0>;
+	};
+
+	upd_pwr_en2_state: upd-pwr-en2-state {
+		pins = "gpio4";
+		function = "normal";
+
+		output-enable;
 		input-disable;
 		power-source = <0>;
 	};
@@ -1494,6 +1722,14 @@
 		pins = "gpio91";
 		function = "gpio";
 		bias-pull-up;
+	};
+
+	usb_hub_reset_state: usb-hub-reset-state {
+		pins = "gpio162";
+		function = "gpio";
+
+		drive-strength = <2>;
+		bias-disable;
 	};
 };
 
