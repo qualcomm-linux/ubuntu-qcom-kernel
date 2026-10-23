@@ -2019,7 +2019,7 @@ CONFIG_ATA_VERBOSE_ERROR                        policy<{'amd64': 'y', 'arm64': '
 CONFIG_ATH10K                                   policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_ATH10K_AHB                               policy<{'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_ATH10K_CE                                policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
-CONFIG_ATH10K_DEBUG                             policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n'}>
+CONFIG_ATH10K_DEBUG                             policy<{'amd64': 'n', 'arm64': 'y', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n'}>
 CONFIG_ATH10K_DEBUGFS                           policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_ATH10K_LEDS                              policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_ATH10K_PCI                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
