@@ -42,6 +42,12 @@ CONFIG_HZ_1000                                  note<'TODO: update note'>
 CONFIG_HZ_250                                   policy<{'arm64': 'n', 'arm64-qcom-rt': 'y'}>
 CONFIG_HZ_250                                   note<'TODO: update note'>
 
+CONFIG_IKCONFIG                                 policy<{'arm64': 'y'}>
+CONFIG_IKCONFIG                                 note<'Required for QC ramdump parsing'>
+
+CONFIG_IKCONFIG_PROC                            policy<{'arm64': 'y'}>
+CONFIG_IKCONFIG_PROC                            note<'Required for QC ramdump parsing'>
+
 CONFIG_INTERCONNECT_QCOM_SHIKRA                 policy<{'arm64': 'y'}>
 CONFIG_INTERCONNECT_QCOM_SHIKRA                 note<'built in: required at boot to bring up storage on Shikra'>
 
