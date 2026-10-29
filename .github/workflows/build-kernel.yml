@@ -19,7 +19,7 @@ name: "Build: Canonical Kernel .deb Packages"
 
 on:
   # Daily build at 15:00 PST (23:00 UTC; GitHub cron runs in UTC). A scheduled run
-  # passes no inputs, so it builds resolute-qcom-devel HEAD (the SUITE default) on
+  # passes no inputs, so it builds resolute-qcom-devel HEAD (the ref default) on
   # the lecore-production runner and uploads the .deb packages to S3 (skip_s3 is
   # unset, so the upload step runs).
   schedule:
@@ -27,14 +27,10 @@ on:
 
   workflow_dispatch:
     inputs:
-      suite:
-        description: "Branch to build: resolute-qcom-devel, resolute-qcom, or any branch based on them"
+      ref:
+        description: "Branch, tag or commit to build, e.g. resolute-qcom-devel, resolute-qcom, Ubuntu-qcom-7.0.0-1016.19"
         required: true
         default: "resolute-qcom-devel"
-        type: string
-      kernel_version:
-        description: "Version (e.g. 7.0.0-1006.8) - builds the exact Ubuntu-qcom-<version> tag. Empty = branch HEAD."
-        required: false
         type: string
       dbgsym:
         description: "Build the -dbgsym.ddeb debug symbol packages alongside the .deb packages."
@@ -49,26 +45,16 @@ on:
 
   workflow_call:
     inputs:
-      suite:
-        description: "Branch to build from"
+      ref:
+        description: "Branch, tag or commit to build (premerge-pr.yml passes the PR merge ref)."
         required: false
         default: "resolute-qcom-devel"
-        type: string
-      kernel_version:
-        description: "Version tag to build. Empty = branch HEAD."
-        required: false
-        default: ""
         type: string
       dbgsym:
         description: "Build the -dbgsym.ddeb debug symbol packages alongside the .deb packages."
         required: false
         default: true
         type: boolean
-      ref:
-        description: "Exact git ref to checkout. Overrides suite/kernel_version when set (used by premerge-pr.yml to build the PR merge ref)."
-        required: false
-        default: ""
-        type: string
       skip_s3:
         description: "Skip uploading built .deb packages to S3 (used by premerge-pr.yml for build-only checks)."
         required: false
@@ -104,9 +90,7 @@ jobs:
     timeout-minutes: 360
 
     env:
-      SUITE:   ${{ inputs.suite   || 'resolute-qcom-devel' }}
-      # Every upload this repository mirrors is tagged Ubuntu-qcom-<version>.
-      UPSTREAM_PREFIX: Ubuntu-qcom
+      BUILD_REF: ${{ inputs.ref || 'resolute-qcom-devel' }}
       ARCH:    arm64
       FLAVOURS: ${{ inputs.flavours || 'ALL' }}
       DBGSYM:  ${{ github.event_name == 'schedule' && 'true' || (inputs.dbgsym && 'true' || 'false') }}
@@ -143,40 +127,9 @@ jobs:
           echo "REPO_NAME=${GITHUB_REPOSITORY#*/}"  >> "$GITHUB_ENV"
 
       # -----------------------------------------------------------------------
-      # 3. Validate kernel_version against existing tags (fail fast)
-      #    Must run BEFORE checkout so a bad version fails immediately with a
-      #    clear error rather than a cryptic git "ref not found" from checkout.
-      # -----------------------------------------------------------------------
-      - name: Validate kernel_version tag exists
-        if: inputs.kernel_version != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          KERNEL_VERSION: ${{ inputs.kernel_version }}
-        run: |
-          TAG="${UPSTREAM_PREFIX}-${KERNEL_VERSION}"
-          echo "Verifying tag '${TAG}' exists in repository..."
-
-          if git ls-remote --exit-code --tags \
-               "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" \
-               "refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "✓ Tag '${TAG}' exists — proceeding with build"
-          else
-            echo "ERROR: Tag '${TAG}' does not exist in this repository." >&2
-            echo "" >&2
-            echo "The kernel_version input must match a version that has been" >&2
-            echo "synced by fetch-source-pkg.yml." >&2
-            echo "" >&2
-            echo "Existing tags: https://github.com/${{ github.repository }}/tags" >&2
-            exit 1
-          fi
-
-      # -----------------------------------------------------------------------
-      # 4. Checkout the kernel source
-      #    - If kernel_version is provided: checkout the exact verbatim Canonical
-      #      tag <UPSTREAM_PREFIX>-<kernel_version> (e.g. Ubuntu-qcom-7.0.0-1006.8)
-      #      so the build uses the precise synced source.
-      #    - If kernel_version is empty: checkout the suite branch HEAD
-      #      (test/dev builds).
+      # 4. Checkout the kernel source at the requested ref: a branch, a
+      #    verbatim Canonical tag such as Ubuntu-qcom-7.0.0-1016.19, a commit,
+      #    or the PR merge ref premerge-pr.yml passes.
       #    Note: actions/checkout checks out a ref of THIS repository
       #    (ubuntu-qcom-kernel). The resolute-qcom* branches of this repo
       #    contain the full kernel source tree mirrored by
@@ -185,7 +138,7 @@ jobs:
       - name: Checkout kernel source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
-          ref: ${{ inputs.ref != '' && inputs.ref || (inputs.kernel_version != '' && format('{0}-{1}', env.UPSTREAM_PREFIX, inputs.kernel_version) || inputs.suite || 'resolute-qcom-devel') }}
+          ref: ${{ env.BUILD_REF }}
           path: kernel-src
           persist-credentials: false
 
@@ -221,9 +174,9 @@ jobs:
       # -----------------------------------------------------------------------
       # 4c. Local version suffix for any build with commits past the last
       #     Canonical sync tag, so it's distinguishable from a plain rebuild of
-      #     that tag. Skipped for kernel_version-pinned builds and for any
-      #     build whose HEAD is exactly a Canonical tag, such as the
-      #     resolute-qcom mirror. Never fails the kernel build itself.
+      #     that tag. Skipped for any build whose HEAD is exactly a Canonical
+      #     tag, such as a tag build or the resolute-qcom mirror. Never fails
+      #     the kernel build itself.
       #
       #     Checked out at main by default: CI scripts must come from the
       #     trusted default branch, not whatever ref is being built. Matters
@@ -251,7 +204,6 @@ jobs:
       - name: Apply Qualcomm local version suffix
         id: version-suffix
         env:
-          KERNEL_VERSION: ${{ inputs.kernel_version }}
           GH_TOKEN: ${{ github.token }}
         run: |
           if bash ./ci-scripts/scripts/apply-local-version-suffix.sh; then
@@ -301,7 +253,7 @@ jobs:
             done
           fi
 
-          echo "Building: suite=${SUITE}  series=${SERIES}  target=${RULES_TARGETS}  arch=${ARCH}  jobs=${JOBS}"
+          echo "Building: ref=${BUILD_REF}  series=${SERIES}  target=${RULES_TARGETS}  arch=${ARCH}  jobs=${JOBS}"
 
           # IMPORTANT: use single quotes for bash -c so the outer shell does NOT
           # expand $(...) or ${VAR} before passing the string to docker.
@@ -462,7 +414,7 @@ jobs:
             echo ""
             echo "| Field | Value |"
             echo "|-------|-------|"
-            echo "| Branch       | \`${SUITE}\` |"
+            echo "| Ref          | \`${BUILD_REF}\` |"
             echo "| Architecture | \`${ARCH}\` |"
             echo "| Flavour      | \`${FLAVOURS}\` |"
             echo "| Dbgsym       | \`${DBGSYM}\` |"

@@ -158,8 +158,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION:  ${{ needs.sync.outputs.synced_version }}
         run: |
-          echo "Building ${BRANCH} ${VERSION} (flavour qcom)"
+          echo "Building ${UPSTREAM_PREFIX}-${VERSION}"
           gh workflow run build-kernel.yml \
             --repo "${{ github.repository }}" \
-            --field suite="${BRANCH}" \
-            --field kernel_version="${VERSION}" 
+            --field ref="${UPSTREAM_PREFIX}-${VERSION}"

@@ -49,11 +49,12 @@ The maintenance workflows below are manual (`Actions → … → Run workflow`, 
 # Sync the mirror to the latest upstream upload (no inputs; idempotent).
 gh workflow run fetch-source-pkg.yml --repo qualcomm-linux/ubuntu-qcom-kernel
 
-# Build .deb packages. Defaults to resolute-qcom-devel HEAD; set the suite input to
-# resolute-qcom for the mirror or to any branch based on either, or kernel_version
-# for an exact tag. The dbgsym input (default true) also builds the unstripped
-# -dbgsym.ddeb.
+# Build .deb packages. Defaults to resolute-qcom-devel HEAD; set the ref input to
+# any branch, tag or commit, e.g. resolute-qcom for the mirror or
+# Ubuntu-qcom-7.0.0-1016.19 for an exact upload. The dbgsym input (default true)
+# also builds the unstripped -dbgsym.ddeb.
 gh workflow run build-kernel.yml --repo qualcomm-linux/ubuntu-qcom-kernel
+gh workflow run build-kernel.yml --repo qualcomm-linux/ubuntu-qcom-kernel -f ref=Ubuntu-qcom-7.0.0-1016.19
 
 # One-time only, before the first sync: seed resolute-qcom with history (into
 # resolute-qcom-seed, which a human then promotes to the live branch).

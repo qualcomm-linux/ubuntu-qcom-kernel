@@ -7,26 +7,24 @@
 # Canonical sync tag, whatever branch they come from, so the package version
 # differs from a plain rebuild of that tag. N is the commit count past the tag
 # and sorts numerically, so later builds always compare as newer. Skipped for
-# kernel_version-pinned builds and for any build whose HEAD is exactly a
-# Canonical tag, such as the resolute-qcom mirror, which must stay
-# byte-identical to Canonical. Nothing here is ever committed to git.
+# any build whose HEAD is exactly a Canonical tag, such as a tag build or the
+# resolute-qcom mirror, which must stay byte-identical to Canonical. Nothing
+# here is ever committed to git.
 #
 # Uses the GitHub Compare API to find the nearest Ubuntu-qcom-* tag rather
 # than local git tags: the checkout is shallow, deepening history alone
 # doesn't fetch tags, and this repo's full tag namespace is too large to
 # fetch blindly on every build.
 #
-# Exits 0 when no suffix is needed (a pinned kernel_version, or HEAD is
-# exactly a sync tag) and 1 when a build that needs one cannot be
-# versioned, so the calling workflow can withhold its packages rather than
-# publish them under the released version of the tag they sit on. Writes a
-# full replacement changelog to a temp file and swaps it in with mv at the
-# end, so a failure partway through never leaves debian/changelog partially
-# written.
+# Exits 0 when no suffix is needed (HEAD is exactly a sync tag) and 1 when a
+# build that needs one cannot be versioned, so the calling workflow can
+# withhold its packages rather than publish them under the released version
+# of the tag they sit on. Writes a full replacement changelog to a temp file
+# and swaps it in with mv at the end, so a failure partway through never
+# leaves debian/changelog partially written.
 set -euo pipefail
 
 : "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
-KERNEL_VERSION="${KERNEL_VERSION:-}"
 
 emit_kernel_version() {
   echo "KERNEL_LOCAL_VERSION=$1" >> "$GITHUB_ENV"
@@ -37,12 +35,6 @@ fail() {
   emit_kernel_version "unmodified"
   exit 1
 }
-
-if [[ -n "$KERNEL_VERSION" ]]; then
-  echo "kernel_version=${KERNEL_VERSION} builds an exact Canonical tag; no local version suffix needed."
-  emit_kernel_version "unmodified"
-  exit 0
-fi
 
 cd kernel-src/
 

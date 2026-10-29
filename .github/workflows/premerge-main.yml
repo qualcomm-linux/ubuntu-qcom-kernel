@@ -35,7 +35,7 @@ jobs:
     # any step runs, and actionlint does not yet parse the $/ form.
     uses: ./.github/workflows/build-kernel.yml # zizmor: ignore[self-repository]
     with:
-      suite: resolute-qcom-devel
+      ref: resolute-qcom-devel
       ci_scripts_ref: refs/pull/${{ github.event.pull_request.number }}/merge
       skip_s3: true
       dbgsym: false
