@@ -1075,7 +1075,7 @@ static int ssd133x_fb_blit_rect(struct drm_framebuffer *fb,
 }
 
 static int ssd130x_primary_plane_atomic_check(struct drm_plane *plane,
-					      struct drm_atomic_state *state)
+					      struct drm_atomic_commit *state)
 {
 	struct drm_device *drm = plane->dev;
 	struct ssd130x_device *ssd130x = drm_to_ssd130x(drm);
@@ -1124,7 +1124,7 @@ static int ssd130x_primary_plane_atomic_check(struct drm_plane *plane,
 }
 
 static int ssd132x_primary_plane_atomic_check(struct drm_plane *plane,
-					      struct drm_atomic_state *state)
+					      struct drm_atomic_commit *state)
 {
 	struct drm_device *drm = plane->dev;
 	struct ssd130x_device *ssd130x = drm_to_ssd130x(drm);
@@ -1173,7 +1173,7 @@ static int ssd132x_primary_plane_atomic_check(struct drm_plane *plane,
 }
 
 static int ssd133x_primary_plane_atomic_check(struct drm_plane *plane,
-					      struct drm_atomic_state *state)
+					      struct drm_atomic_commit *state)
 {
 	struct drm_plane_state *plane_state = drm_atomic_get_new_plane_state(state, plane);
 	struct drm_crtc *crtc = plane_state->crtc;
@@ -1196,7 +1196,7 @@ static int ssd133x_primary_plane_atomic_check(struct drm_plane *plane,
 }
 
 static void ssd130x_primary_plane_atomic_update(struct drm_plane *plane,
-						struct drm_atomic_state *state)
+						struct drm_atomic_commit *state)
 {
 	struct drm_plane_state *plane_state = drm_atomic_get_new_plane_state(state, plane);
 	struct drm_plane_state *old_plane_state = drm_atomic_get_old_plane_state(state, plane);
@@ -1237,7 +1237,7 @@ out_drm_dev_exit:
 }
 
 static void ssd132x_primary_plane_atomic_update(struct drm_plane *plane,
-						struct drm_atomic_state *state)
+						struct drm_atomic_commit *state)
 {
 	struct drm_plane_state *plane_state = drm_atomic_get_new_plane_state(state, plane);
 	struct drm_plane_state *old_plane_state = drm_atomic_get_old_plane_state(state, plane);
@@ -1278,7 +1278,7 @@ out_drm_dev_exit:
 }
 
 static void ssd133x_primary_plane_atomic_update(struct drm_plane *plane,
-						struct drm_atomic_state *state)
+						struct drm_atomic_commit *state)
 {
 	struct drm_plane_state *plane_state = drm_atomic_get_new_plane_state(state, plane);
 	struct drm_plane_state *old_plane_state = drm_atomic_get_old_plane_state(state, plane);
@@ -1317,7 +1317,7 @@ out_drm_dev_exit:
 }
 
 static void ssd130x_primary_plane_atomic_disable(struct drm_plane *plane,
-						 struct drm_atomic_state *state)
+						 struct drm_atomic_commit *state)
 {
 	struct drm_device *drm = plane->dev;
 	struct ssd130x_device *ssd130x = drm_to_ssd130x(drm);
@@ -1341,7 +1341,7 @@ static void ssd130x_primary_plane_atomic_disable(struct drm_plane *plane,
 }
 
 static void ssd132x_primary_plane_atomic_disable(struct drm_plane *plane,
-						 struct drm_atomic_state *state)
+						 struct drm_atomic_commit *state)
 {
 	struct drm_device *drm = plane->dev;
 	struct ssd130x_device *ssd130x = drm_to_ssd130x(drm);
@@ -1365,7 +1365,7 @@ static void ssd132x_primary_plane_atomic_disable(struct drm_plane *plane,
 }
 
 static void ssd133x_primary_plane_atomic_disable(struct drm_plane *plane,
-						 struct drm_atomic_state *state)
+						 struct drm_atomic_commit *state)
 {
 	struct drm_device *drm = plane->dev;
 	struct ssd130x_device *ssd130x = drm_to_ssd130x(drm);
@@ -1477,7 +1477,7 @@ static enum drm_mode_status ssd130x_crtc_mode_valid(struct drm_crtc *crtc,
 }
 
 static int ssd130x_crtc_atomic_check(struct drm_crtc *crtc,
-				     struct drm_atomic_state *state)
+				     struct drm_atomic_commit *state)
 {
 	struct drm_device *drm = crtc->dev;
 	struct ssd130x_device *ssd130x = drm_to_ssd130x(drm);
@@ -1498,7 +1498,7 @@ static int ssd130x_crtc_atomic_check(struct drm_crtc *crtc,
 }
 
 static int ssd132x_crtc_atomic_check(struct drm_crtc *crtc,
-				     struct drm_atomic_state *state)
+				     struct drm_atomic_commit *state)
 {
 	struct drm_device *drm = crtc->dev;
 	struct ssd130x_device *ssd130x = drm_to_ssd130x(drm);
@@ -1519,7 +1519,7 @@ static int ssd132x_crtc_atomic_check(struct drm_crtc *crtc,
 }
 
 static int ssd133x_crtc_atomic_check(struct drm_crtc *crtc,
-				     struct drm_atomic_state *state)
+				     struct drm_atomic_commit *state)
 {
 	struct drm_device *drm = crtc->dev;
 	struct ssd130x_device *ssd130x = drm_to_ssd130x(drm);
@@ -1622,7 +1622,7 @@ static const struct drm_crtc_funcs ssd130x_crtc_funcs = {
 };
 
 static void ssd130x_encoder_atomic_enable(struct drm_encoder *encoder,
-					  struct drm_atomic_state *state)
+					  struct drm_atomic_commit *state)
 {
 	struct drm_device *drm = encoder->dev;
 	struct ssd130x_device *ssd130x = drm_to_ssd130x(drm);
@@ -1648,7 +1648,7 @@ power_off:
 }
 
 static void ssd132x_encoder_atomic_enable(struct drm_encoder *encoder,
-					  struct drm_atomic_state *state)
+					  struct drm_atomic_commit *state)
 {
 	struct drm_device *drm = encoder->dev;
 	struct ssd130x_device *ssd130x = drm_to_ssd130x(drm);
@@ -1673,7 +1673,7 @@ power_off:
 }
 
 static void ssd133x_encoder_atomic_enable(struct drm_encoder *encoder,
-					  struct drm_atomic_state *state)
+					  struct drm_atomic_commit *state)
 {
 	struct drm_device *drm = encoder->dev;
 	struct ssd130x_device *ssd130x = drm_to_ssd130x(drm);
@@ -1698,7 +1698,7 @@ power_off:
 }
 
 static void ssd130x_encoder_atomic_disable(struct drm_encoder *encoder,
-					   struct drm_atomic_state *state)
+					   struct drm_atomic_commit *state)
 {
 	struct drm_device *drm = encoder->dev;
 	struct ssd130x_device *ssd130x = drm_to_ssd130x(drm);

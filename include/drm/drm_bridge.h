@@ -317,7 +317,7 @@ struct drm_bridge_funcs {
 	 * The @atomic_pre_enable callback is optional.
 	 */
 	void (*atomic_pre_enable)(struct drm_bridge *bridge,
-				  struct drm_atomic_state *state);
+				  struct drm_atomic_commit *state);
 
 	/**
 	 * @atomic_enable:
@@ -337,7 +337,7 @@ struct drm_bridge_funcs {
 	 * The @atomic_enable callback is optional.
 	 */
 	void (*atomic_enable)(struct drm_bridge *bridge,
-			      struct drm_atomic_state *state);
+			      struct drm_atomic_commit *state);
 	/**
 	 * @atomic_disable:
 	 *
@@ -354,7 +354,7 @@ struct drm_bridge_funcs {
 	 * The @atomic_disable callback is optional.
 	 */
 	void (*atomic_disable)(struct drm_bridge *bridge,
-			       struct drm_atomic_state *state);
+			       struct drm_atomic_commit *state);
 
 	/**
 	 * @atomic_post_disable:
@@ -373,7 +373,7 @@ struct drm_bridge_funcs {
 	 * The @atomic_post_disable callback is optional.
 	 */
 	void (*atomic_post_disable)(struct drm_bridge *bridge,
-				    struct drm_atomic_state *state);
+				    struct drm_atomic_commit *state);
 
 	/**
 	 * @atomic_duplicate_state:
@@ -529,6 +529,22 @@ struct drm_bridge_funcs {
 	 * giving the reason of the failure otherwise.
 	 */
 	struct drm_bridge_state *(*atomic_reset)(struct drm_bridge *bridge);
+
+	/**
+	 * @atomic_create_state:
+	 *
+	 * Allocate a pristine, initialized, state for the bridge
+	 * object and return it. This callback must have no side
+	 * effects: in particular, the returned state must not be
+	 * assigned to the object's state pointer and it must not affect
+	 * the hardware state.
+	 *
+	 * RETURNS:
+	 *
+	 * A new, pristine, bridge state instance or an error pointer
+	 * on failure.
+	 */
+	struct drm_bridge_state *(*atomic_create_state)(struct drm_bridge *bridge);
 
 	/**
 	 * @detect:
@@ -1325,6 +1341,8 @@ int drm_bridge_attach(struct drm_encoder *encoder, struct drm_bridge *bridge,
 #ifdef CONFIG_OF
 struct drm_bridge *of_drm_find_and_get_bridge(struct device_node *np);
 struct drm_bridge *of_drm_find_bridge(struct device_node *np);
+struct drm_bridge *of_drm_get_bridge_by_endpoint(const struct device_node *np,
+						 int port, int endpoint);
 #else
 static inline struct drm_bridge *of_drm_find_and_get_bridge(struct device_node *np)
 {
@@ -1333,6 +1351,11 @@ static inline struct drm_bridge *of_drm_find_and_get_bridge(struct device_node *
 static inline struct drm_bridge *of_drm_find_bridge(struct device_node *np)
 {
 	return NULL;
+}
+static inline struct drm_bridge *of_drm_get_bridge_by_endpoint(const struct device_node *np,
+							       int port, int endpoint)
+{
+	return ERR_PTR(-ENODEV);
 }
 #endif
 
@@ -1362,7 +1385,8 @@ drm_bridge_get_current_state(struct drm_bridge *bridge)
 	 * drm_atomic_private_obj_init(), so we need to make sure we're
 	 * working with one before we try to use the lock.
 	 */
-	if (!bridge->funcs || !bridge->funcs->atomic_reset)
+	if (!bridge->funcs ||
+	    !(bridge->funcs->atomic_reset || bridge->funcs->atomic_create_state))
 		return NULL;
 
 	drm_modeset_lock_assert_held(&bridge->base.lock);
@@ -1524,13 +1548,13 @@ int drm_atomic_bridge_chain_check(struct drm_bridge *bridge,
 				  struct drm_crtc_state *crtc_state,
 				  struct drm_connector_state *conn_state);
 void drm_atomic_bridge_chain_disable(struct drm_bridge *bridge,
-				     struct drm_atomic_state *state);
+				     struct drm_atomic_commit *state);
 void drm_atomic_bridge_chain_post_disable(struct drm_bridge *bridge,
-					  struct drm_atomic_state *state);
+					  struct drm_atomic_commit *state);
 void drm_atomic_bridge_chain_pre_enable(struct drm_bridge *bridge,
-					struct drm_atomic_state *state);
+					struct drm_atomic_commit *state);
 void drm_atomic_bridge_chain_enable(struct drm_bridge *bridge,
-				    struct drm_atomic_state *state);
+				    struct drm_atomic_commit *state);
 
 u32 *
 drm_atomic_helper_bridge_propagate_bus_fmt(struct drm_bridge *bridge,

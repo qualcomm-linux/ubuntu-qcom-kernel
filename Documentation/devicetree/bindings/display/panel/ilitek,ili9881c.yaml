@@ -26,6 +26,7 @@ properties:
           - tdo,tl050hdv35
           - wanchanglong,w552946aaa
           - wanchanglong,w552946aba
+          - waveshare,7.0-dsi-touch-a
       - const: ilitek,ili9881c
 
   reg:
@@ -34,6 +35,7 @@ properties:
   backlight: true
   port: true
   power-supply: true
+  iovcc-supply: true
   reset-gpios: true
   rotation: true
 

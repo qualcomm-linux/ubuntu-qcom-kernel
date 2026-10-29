@@ -829,7 +829,7 @@ static int rcar_mipi_dsi_attach(struct drm_bridge *bridge,
 }
 
 static void rcar_mipi_dsi_atomic_enable(struct drm_bridge *bridge,
-					struct drm_atomic_state *state)
+					struct drm_atomic_commit *state)
 {
 	struct rcar_mipi_dsi *dsi = bridge_to_rcar_mipi_dsi(bridge);
 
@@ -837,7 +837,7 @@ static void rcar_mipi_dsi_atomic_enable(struct drm_bridge *bridge,
 }
 
 static void rcar_mipi_dsi_atomic_disable(struct drm_bridge *bridge,
-					 struct drm_atomic_state *state)
+					 struct drm_atomic_commit *state)
 {
 	struct rcar_mipi_dsi *dsi = bridge_to_rcar_mipi_dsi(bridge);
 
@@ -845,7 +845,7 @@ static void rcar_mipi_dsi_atomic_disable(struct drm_bridge *bridge,
 }
 
 void rcar_mipi_dsi_pclk_enable(struct drm_bridge *bridge,
-			       struct drm_atomic_state *state)
+			       struct drm_atomic_commit *state)
 {
 	struct rcar_mipi_dsi *dsi = bridge_to_rcar_mipi_dsi(bridge);
 	const struct drm_display_mode *mode;

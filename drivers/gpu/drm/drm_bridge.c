@@ -460,14 +460,32 @@ drm_bridge_atomic_destroy_priv_state(struct drm_private_obj *obj,
 	bridge->funcs->atomic_destroy_state(bridge, state);
 }
 
+static struct drm_private_state *
+drm_bridge_atomic_create_priv_state(struct drm_private_obj *obj)
+{
+	struct drm_bridge *bridge = drm_priv_to_bridge(obj);
+	struct drm_bridge_state *state;
+
+	if (bridge->funcs->atomic_create_state)
+		state = bridge->funcs->atomic_create_state(bridge);
+	else
+		state = bridge->funcs->atomic_reset(bridge);
+	if (IS_ERR(state))
+		return ERR_CAST(state);
+
+	return &state->base;
+}
+
 static const struct drm_private_state_funcs drm_bridge_priv_state_funcs = {
+	.atomic_create_state = drm_bridge_atomic_create_priv_state,
 	.atomic_duplicate_state = drm_bridge_atomic_duplicate_priv_state,
 	.atomic_destroy_state = drm_bridge_atomic_destroy_priv_state,
 };
 
 static bool drm_bridge_is_atomic(struct drm_bridge *bridge)
 {
-	return bridge->funcs->atomic_reset != NULL;
+	return (bridge->funcs->atomic_create_state ||
+		bridge->funcs->atomic_reset);
 }
 
 /**
@@ -537,25 +555,12 @@ int drm_bridge_attach(struct drm_encoder *encoder, struct drm_bridge *bridge,
 			goto err_reset_bridge;
 	}
 
-	if (drm_bridge_is_atomic(bridge)) {
-		struct drm_bridge_state *state;
-
-		state = bridge->funcs->atomic_reset(bridge);
-		if (IS_ERR(state)) {
-			ret = PTR_ERR(state);
-			goto err_detach_bridge;
-		}
-
+	if (drm_bridge_is_atomic(bridge))
 		drm_atomic_private_obj_init(bridge->dev, &bridge->base,
-					    &state->base,
+					    NULL,
 					    &drm_bridge_priv_state_funcs);
-	}
 
 	return 0;
-
-err_detach_bridge:
-	if (bridge->funcs->detach)
-		bridge->funcs->detach(bridge);
 
 err_reset_bridge:
 	bridge->dev = NULL;
@@ -768,7 +773,7 @@ EXPORT_SYMBOL(drm_bridge_chain_mode_set);
  * Note: the bridge passed should be the one closest to the encoder
  */
 void drm_atomic_bridge_chain_disable(struct drm_bridge *bridge,
-				     struct drm_atomic_state *state)
+				     struct drm_atomic_commit *state)
 {
 	struct drm_encoder *encoder;
 	struct drm_bridge *iter;
@@ -791,7 +796,7 @@ void drm_atomic_bridge_chain_disable(struct drm_bridge *bridge,
 EXPORT_SYMBOL(drm_atomic_bridge_chain_disable);
 
 static void drm_atomic_bridge_call_post_disable(struct drm_bridge *bridge,
-						struct drm_atomic_state *state)
+						struct drm_atomic_commit *state)
 {
 	if (state && bridge->funcs->atomic_post_disable)
 		bridge->funcs->atomic_post_disable(bridge, state);
@@ -824,7 +829,7 @@ static void drm_atomic_bridge_call_post_disable(struct drm_bridge *bridge,
  * Note: the bridge passed should be the one closest to the encoder
  */
 void drm_atomic_bridge_chain_post_disable(struct drm_bridge *bridge,
-					  struct drm_atomic_state *state)
+					  struct drm_atomic_commit *state)
 {
 	struct drm_encoder *encoder;
 	struct drm_bridge *next, *limit;
@@ -886,7 +891,7 @@ void drm_atomic_bridge_chain_post_disable(struct drm_bridge *bridge,
 EXPORT_SYMBOL(drm_atomic_bridge_chain_post_disable);
 
 static void drm_atomic_bridge_call_pre_enable(struct drm_bridge *bridge,
-					      struct drm_atomic_state *state)
+					      struct drm_atomic_commit *state)
 {
 	if (state && bridge->funcs->atomic_pre_enable)
 		bridge->funcs->atomic_pre_enable(bridge, state);
@@ -918,7 +923,7 @@ static void drm_atomic_bridge_call_pre_enable(struct drm_bridge *bridge,
  * Note: the bridge passed should be the one closest to the encoder
  */
 void drm_atomic_bridge_chain_pre_enable(struct drm_bridge *bridge,
-					struct drm_atomic_state *state)
+					struct drm_atomic_commit *state)
 {
 	struct drm_encoder *encoder;
 	struct drm_bridge *iter, *next, *limit;
@@ -986,7 +991,7 @@ EXPORT_SYMBOL(drm_atomic_bridge_chain_pre_enable);
  * Note: the bridge passed should be the one closest to the encoder
  */
 void drm_atomic_bridge_chain_enable(struct drm_bridge *bridge,
-				    struct drm_atomic_state *state)
+				    struct drm_atomic_commit *state)
 {
 	struct drm_encoder *encoder;
 
@@ -1215,7 +1220,7 @@ drm_atomic_bridge_chain_select_bus_fmts(struct drm_bridge *bridge,
 static void
 drm_atomic_bridge_propagate_bus_flags(struct drm_bridge *bridge,
 				      struct drm_connector *conn,
-				      struct drm_atomic_state *state)
+				      struct drm_atomic_commit *state)
 {
 	struct drm_bridge_state *bridge_state, *next_bridge_state;
 	u32 output_flags = 0;
@@ -1547,6 +1552,47 @@ struct drm_bridge *of_drm_find_bridge(struct device_node *np)
 	return bridge;
 }
 EXPORT_SYMBOL(of_drm_find_bridge);
+
+/**
+ * of_drm_get_bridge_by_endpoint - return DRM bridge connected to a port/endpoint
+ * @np: device tree node containing output ports
+ * @port: port in the device tree node, or -1 for the first port found
+ * @endpoint: endpoint in the device tree node, or -1 for the first endpoint found
+ *
+ * Given a DT node's port and endpoint number, find the connected node and
+ * return the associated drm_bridge device.
+ *
+ * The refcount of the returned bridge is incremented. Use drm_bridge_put()
+ * when done with it.
+ *
+ * Returns a pointer to the connected drm_bridge, or a negative error on failure
+ */
+struct drm_bridge *of_drm_get_bridge_by_endpoint(const struct device_node *np,
+						 int port, int endpoint)
+{
+	struct drm_bridge *bridge;
+
+	/*
+	 * of_graph_get_remote_node() produces a noisy error message if port
+	 * node isn't found and the absence of the port is a legit case here,
+	 * so at first we silently check whether graph is present in the
+	 * device-tree node.
+	 */
+	if (!of_graph_is_present(np))
+		return ERR_PTR(-ENODEV);
+
+	struct device_node *remote __free(device_node) =
+		of_graph_get_remote_node(np, port, endpoint);
+	if (!remote)
+		return ERR_PTR(-ENODEV);
+
+	bridge = of_drm_find_and_get_bridge(remote);
+	if (!bridge)
+		return ERR_PTR(-EPROBE_DEFER);
+
+	return bridge;
+}
+EXPORT_SYMBOL_GPL(of_drm_get_bridge_by_endpoint);
 #endif
 
 /**

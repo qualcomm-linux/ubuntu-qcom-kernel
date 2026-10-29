@@ -801,6 +801,7 @@ CONFIG_DRM_NOUVEAU_SIL164                       policy<{'arm64': '-'}>
 CONFIG_DRM_NOUVEAU_SVM                          policy<{'arm64': '-'}>
 CONFIG_DRM_PANEL_BACKLIGHT_QUIRKS               policy<{'arm64': '-'}>
 CONFIG_DRM_PANEL_DLC0697                        policy<{'arm64': 'y'}>
+CONFIG_DRM_PANEL_FOCALTECH_OTA7290B             policy<{'arm64': 'n'}>
 CONFIG_DRM_PANIC_SCREEN_QR_CODE                 policy<{'arm64': '-'}>
 CONFIG_DRM_PL111                                policy<{'arm64': 'n'}>
 CONFIG_DRM_RADEON                               policy<{'arm64': 'n'}>
@@ -961,6 +962,7 @@ CONFIG_GPIO_THUNDERX                            policy<{'arm64': '-'}>
 CONFIG_GPIO_TN48M_CPLD                          policy<{'arm64': '-'}>
 CONFIG_GPIO_VF610                               policy<{'arm64': '-'}>
 CONFIG_GPIO_VISCONTI                            policy<{'arm64': '-'}>
+CONFIG_GPIO_WAVESHARE_DSI_TOUCH                 policy<{'arm64': 'm'}>
 CONFIG_GPIO_XGENE_SB                            policy<{'arm64': '-'}>
 CONFIG_GPIO_XLP                                 policy<{'arm64': '-'}>
 CONFIG_GPIO_ZYNQ                                policy<{'arm64': '-'}>

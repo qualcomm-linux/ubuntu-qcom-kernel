@@ -514,7 +514,7 @@ static void sn65dsi83_release_resources(void *data)
 }
 
 static void sn65dsi83_atomic_pre_enable(struct drm_bridge *bridge,
-					struct drm_atomic_state *state)
+					struct drm_atomic_commit *state)
 {
 	struct sn65dsi83 *ctx = bridge_to_sn65dsi83(bridge);
 	const unsigned int dual_factor = ctx->lvds_dual_link ? 2 : 1;
@@ -696,7 +696,7 @@ err_exit:
 }
 
 static void sn65dsi83_atomic_enable(struct drm_bridge *bridge,
-				    struct drm_atomic_state *state)
+				    struct drm_atomic_commit *state)
 {
 	struct sn65dsi83 *ctx = bridge_to_sn65dsi83(bridge);
 	unsigned int pval;
@@ -728,7 +728,7 @@ static void sn65dsi83_atomic_enable(struct drm_bridge *bridge,
 }
 
 static void sn65dsi83_atomic_disable(struct drm_bridge *bridge,
-				     struct drm_atomic_state *state)
+				     struct drm_atomic_commit *state)
 {
 	struct sn65dsi83 *ctx = bridge_to_sn65dsi83(bridge);
 	int idx;
@@ -966,9 +966,8 @@ static int sn65dsi83_host_attach(struct sn65dsi83 *ctx)
 
 	dsi->lanes = dsi_lanes;
 	dsi->format = MIPI_DSI_FMT_RGB888;
-	dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
-			  MIPI_DSI_MODE_VIDEO_NO_HFP | MIPI_DSI_MODE_VIDEO_NO_HBP |
-			  MIPI_DSI_MODE_VIDEO_NO_HSA | MIPI_DSI_MODE_NO_EOT_PACKET;
+	dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_NO_HSA |
+			  MIPI_DSI_MODE_NO_EOT_PACKET;
 
 	ret = devm_mipi_dsi_attach(dev, dsi);
 	if (ret < 0) {
