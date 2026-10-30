@@ -1481,8 +1481,10 @@ CONFIG_PCI_KEYSTONE_TRISTATE                    policy<{'arm64': '-'}>
 CONFIG_PCI_LAYERSCAPE                           policy<{'arm64': '-'}>
 CONFIG_PCI_LAYERSCAPE_EP                        policy<{'arm64': '-'}>
 CONFIG_PCI_PWRCTL                               policy<{'arm64': '-'}>
+CONFIG_PCI_PWRCTRL_GENERIC                      policy<{'arm64': 'y'}>
 CONFIG_PCI_PWRCTL_PWRSEQ                        policy<{'arm64': '-'}>
 CONFIG_PCI_PWRCTRL_TC9563                       policy<{'arm64': 'y'}>
+CONFIG_PCI_PWRCTRL_SLOT                         policy<{'arm64': '-'}>
 CONFIG_PCI_SKY1_HOST                            policy<{'arm64': '-'}>
 CONFIG_PCI_TEGRA                                policy<{'arm64': '-'}>
 CONFIG_PCS_LYNX                                 policy<{'arm64': 'm'}>
@@ -2568,6 +2570,7 @@ CONFIG_TURRIS_SIGNING_KEY                       policy<{'arm64': '-'}>
 CONFIG_ULTRASOC_SMB                             policy<{'arm64': 'n'}>
 CONFIG_USB_CDNS3_IMX                            policy<{'arm64': '-'}>
 CONFIG_USB_CDNS3_TI                             policy<{'arm64': '-'}>
+CONFIG_USB_CONN_GPIO                            policy<{'arm64': 'm'}>
 CONFIG_USB_DWC3_AM62                            policy<{'arm64': '-'}>
 CONFIG_USB_DWC3_APPLE                           policy<{'arm64': '-'}>
 CONFIG_USB_DWC3_IMX8MP                          policy<{'arm64': '-'}>
@@ -2581,6 +2584,7 @@ CONFIG_USB_EHCI_MV                              policy<{'arm64': '-'}>
 CONFIG_USB_EHCI_TEGRA                           policy<{'arm64': '-'}>
 CONFIG_USB_EMXX                                 policy<{'arm64': '-'}>
 CONFIG_USB_F_QDSS                               policy<{'arm64': '-'}>
+CONFIG_USB_HSIC_USB4604                         policy<{'arm64': 'm'}>
 CONFIG_USB_HUB_USB5807                          policy<{'arm64': '-'}>
 CONFIG_USB_MTU3                                 policy<{'arm64': '-'}>
 CONFIG_USB_MTU3_DEBUG                           policy<{'arm64': '-'}>
