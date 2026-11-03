@@ -30,6 +30,9 @@ CONFIG_DRM_MGAG200                              note<'LP: #1693337'>
 CONFIG_DRM_NOVA                                 policy<{'arm64': '-'}>
 CONFIG_DRM_NOVA                                 note<'TODO: update note'>
 
+CONFIG_DRM_PANEL_ILITEK_ILI7807S                policy<{'arm64': 'm'}>
+CONFIG_DRM_PANEL_ILITEK_ILI7807S                note<'DLC0697 panel on Shikra EVK, renamed from DRM_PANEL_DLC0697; module like the other DRM panels and DRM_MSM'>
+
 CONFIG_EFI_ZBOOT                                policy<{'arm64': 'n'}>
 CONFIG_EFI_ZBOOT                                note<'we use arch/arm64/boot/Image.gz'>
 
@@ -806,7 +809,6 @@ CONFIG_DRM_NOUVEAU_GSP_DEFAULT                  policy<{'arm64': '-'}>
 CONFIG_DRM_NOUVEAU_SIL164                       policy<{'arm64': '-'}>
 CONFIG_DRM_NOUVEAU_SVM                          policy<{'arm64': '-'}>
 CONFIG_DRM_PANEL_BACKLIGHT_QUIRKS               policy<{'arm64': '-'}>
-CONFIG_DRM_PANEL_DLC0697                        policy<{'arm64': 'y'}>
 CONFIG_DRM_PANEL_FOCALTECH_OTA7290B             policy<{'arm64': 'n'}>
 CONFIG_DRM_PANIC_SCREEN_QR_CODE                 policy<{'arm64': '-'}>
 CONFIG_DRM_PL111                                policy<{'arm64': 'n'}>
