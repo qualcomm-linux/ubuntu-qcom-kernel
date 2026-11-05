@@ -78,6 +78,11 @@ struct qmi_elem_info {
 	const struct qmi_elem_info *ei_array;
 };
 
+/*
+ * Enumerate the IDs of the QMI services
+ */
+#define QMI_SERVICE_ID_TMD		0x18	/*   24 */
+
 #define QMI_RESULT_SUCCESS_V01			0
 #define QMI_RESULT_FAILURE_V01			1
 

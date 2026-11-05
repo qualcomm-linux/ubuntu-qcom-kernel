@@ -90,7 +90,7 @@ static int khadas_mcu_fan_probe(struct platform_device *pdev)
 	ctx->mcu = mcu;
 	platform_set_drvdata(pdev, ctx);
 
-	cdev = devm_thermal_of_cooling_device_register(dev->parent,
+	cdev = devm_thermal_of_child_cooling_device_register(dev->parent,
 			dev->parent->of_node, "khadas-mcu-fan", ctx,
 			&khadas_mcu_fan_cooling_ops);
 	if (IS_ERR(cdev)) {

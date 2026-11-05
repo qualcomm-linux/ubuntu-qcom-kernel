@@ -793,7 +793,7 @@ static int max6650_probe(struct i2c_client *client)
 		return err;
 
 	if (IS_ENABLED(CONFIG_THERMAL)) {
-		cooling_dev = devm_thermal_of_cooling_device_register(dev,
+		cooling_dev = devm_thermal_of_child_cooling_device_register(dev,
 						dev->of_node, client->name,
 						data, &max6650_cooling_ops);
 		if (IS_ERR(cooling_dev)) {
