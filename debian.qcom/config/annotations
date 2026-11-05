@@ -300,8 +300,12 @@ CONFIG_ASYNC_MEMCPY                             policy<{'arm64': 'm', 'arm64-qco
 CONFIG_ASYNC_PQ                                 policy<{'arm64': 'm', 'arm64-qcom': 'y'}>
 CONFIG_ASYNC_RAID6_RECOV                        policy<{'arm64': 'm', 'arm64-qcom': 'y'}>
 CONFIG_ASYNC_XOR                                policy<{'arm64': 'm', 'arm64-qcom': 'y'}>
+CONFIG_ATH10K_DEBUG                             policy<{'arm64': 'y'}>
 CONFIG_ATH10K_DFS_CERTIFIED                     policy<{'arm64': 'n'}>
+CONFIG_ATH11K_CFR                               policy<{'arm64': 'y'}>
 CONFIG_ATH11K_COREDUMP                          policy<{'arm64': '-'}>
+CONFIG_ATH11K_DEBUG                             policy<{'arm64': 'y'}>
+CONFIG_ATH12K_COREDUMP                          policy<{'arm64': 'y'}>
 CONFIG_ATH5K_TEST_CHANNELS                      policy<{'arm64': 'n'}>
 CONFIG_ATH6KL_REGDOMAIN                         policy<{'arm64': 'n'}>
 CONFIG_ATH9K_DFS_CERTIFIED                      policy<{'arm64': 'n'}>
