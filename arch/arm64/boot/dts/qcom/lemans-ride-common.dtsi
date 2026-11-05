@@ -962,7 +962,6 @@
 
 &pcie0 {
 	perst-gpios = <&tlmm 2 GPIO_ACTIVE_LOW>;
-	wake-gpios = <&tlmm 0 GPIO_ACTIVE_HIGH>;
 
 	pinctrl-names = "default";
 	pinctrl-0 = <&pcie0_default_state>;
@@ -972,7 +971,6 @@
 
 &pcie1 {
 	perst-gpios = <&tlmm 4 GPIO_ACTIVE_LOW>;
-	wake-gpios = <&tlmm 5 GPIO_ACTIVE_HIGH>;
 
 	pinctrl-names = "default";
 	pinctrl-0 = <&pcie1_default_state>;
@@ -1005,6 +1003,8 @@
 
 		qcom,calibration-variant = "QC_SA8775P_Ride";
 
+		wake-gpios = <&tlmm 0 GPIO_ACTIVE_HIGH>;
+
 		vddrfacmn-supply = <&vreg_pmu_rfa_cmn>;
 		vddaon-supply = <&vreg_pmu_aon_0p59>;
 		vddwlcx-supply = <&vreg_pmu_wlcx_0p8>;
@@ -1014,7 +1014,12 @@
 		vddrfa1p7-supply = <&vreg_pmu_rfa_1p7>;
 		vddpcie0p9-supply = <&vreg_pmu_pcie_0p9>;
 		vddpcie1p8-supply = <&vreg_pmu_pcie_1p8>;
+
 	};
+};
+
+&pcieport1 {
+	wake-gpios = <&tlmm 5 GPIO_ACTIVE_LOW>;
 };
 
 &remoteproc_adsp {
