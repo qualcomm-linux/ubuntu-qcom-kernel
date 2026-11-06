@@ -239,6 +239,9 @@
 		pinctrl-0 = <&pcie0_tc9563_resx_n>;
 		pinctrl-names = "default";
 
+		aspm-no-l0s;
+		aspm-no-l1;
+
 		pcie@1,0 {
 			reg = <0x20800 0x0 0x0 0x0 0x0>;
 			#address-cells = <3>;
@@ -247,6 +250,9 @@
 			device_type = "pci";
 			ranges;
 			bus-range = <0x3 0xff>;
+
+			aspm-no-l0s;
+			aspm-no-l1;
 		};
 
 		pcie@2,0 {
@@ -257,6 +263,9 @@
 			device_type = "pci";
 			ranges;
 			bus-range = <0x4 0xff>;
+
+			aspm-no-l0s;
+			aspm-no-l1;
 		};
 
 		pcie@3,0 {
@@ -334,6 +343,9 @@
 		pinctrl-0 = <&pcie1_tc9563_resx_n>;
 		pinctrl-names = "default";
 
+		aspm-no-l0s;
+		aspm-no-l1;
+
 		pcie@1,0 {
 			reg = <0x40800 0x0 0x0 0x0 0x0>;
 			#address-cells = <3>;
@@ -342,6 +354,9 @@
 			device_type = "pci";
 			ranges;
 			bus-range = <0x3 0xff>;
+
+			aspm-no-l0s;
+			aspm-no-l1;
 		};
 
 		pcie@2,0 {
@@ -352,6 +367,9 @@
 			device_type = "pci";
 			ranges;
 			bus-range = <0x4 0xff>;
+
+			aspm-no-l0s;
+			aspm-no-l1;
 		};
 
 		pcie@3,0 {
