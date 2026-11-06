@@ -125,6 +125,14 @@
 			data = /incbin/("./arch/arm64/boot/dts/qcom/monaco-evk-camera-imx577.dtbo");
 			type = "flat_dt";
 		};
+		fdt-monaco-evk-sd-card.dtbo {
+			data = /incbin/("./arch/arm64/boot/dts/qcom/monaco-evk-sd-card.dtbo");
+			type = "flat_dt";
+		};
+		fdt-monaco-evk-emmc.dtbo {
+			data = /incbin/("./arch/arm64/boot/dts/qcom/monaco-evk-emmc.dtbo");
+			type = "flat_dt";
+		};
 		fdt-hamoa-staging.dtbo {
 			data = /incbin/("./arch/arm64/boot/dts/qcom/hamoa-staging.dtbo");
 			type = "flat_dt";
