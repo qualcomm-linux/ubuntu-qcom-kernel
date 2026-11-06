@@ -125,6 +125,22 @@
 			data = /incbin/("./arch/arm64/boot/dts/qcom/monaco-evk-camera-imx577.dtbo");
 			type = "flat_dt";
 		};
+		fdt-monaco-evk-staging.dtbo {
+			data = /incbin/("./arch/arm64/boot/dts/qcom/monaco-evk-staging.dtbo");
+			type = "flat_dt";
+		};
+		fdt-monaco-staging.dtbo {
+			data = /incbin/("./arch/arm64/boot/dts/qcom/monaco-staging.dtbo");
+			type = "flat_dt";
+		};
+		fdt-monaco-evk-sd-card.dtbo {
+			data = /incbin/("./arch/arm64/boot/dts/qcom/monaco-evk-sd-card.dtbo");
+			type = "flat_dt";
+		};
+		fdt-monaco-evk-emmc.dtbo {
+			data = /incbin/("./arch/arm64/boot/dts/qcom/monaco-evk-emmc.dtbo");
+			type = "flat_dt";
+		};
 		fdt-hamoa-staging.dtbo {
 			data = /incbin/("./arch/arm64/boot/dts/qcom/hamoa-staging.dtbo");
 			type = "flat_dt";
@@ -400,6 +416,47 @@
 		conf-69 {
 			compatible = "qcom,mahua-crd";
 			fdt = "fdt-mahua-crd.dtb";
+		};
+		conf-70 {
+			compatible = "qcom,qcs8275-iot-sd-card";
+			fdt = "fdt-monaco-evk.dtb", "fdt-monaco-evk-camera-imx577.dtbo",
+			      "fdt-monaco-evk-sd-card.dtbo";
+		};
+		conf-71 {
+			compatible = "qcom,qcs8275-iot-emmc";
+			fdt = "fdt-monaco-evk.dtb", "fdt-monaco-evk-camera-imx577.dtbo",
+			      "fdt-monaco-evk-emmc.dtbo";
+		};
+		conf-72 {
+			compatible = "qcom,qcs8275-iot-staging-emmc";
+			fdt = "fdt-monaco-evk.dtb", "fdt-monaco-evk-camera-imx577.dtbo",
+			      "fdt-monaco-staging.dtbo", "fdt-monaco-evk-emmc.dtbo";
+		};
+		conf-73 {
+			compatible = "qcom,qcs8275-iot-camx-sd-card";
+			fdt = "fdt-monaco-evk.dtb", "fdt-monaco-evk-camx.dtbo",
+			      "fdt-monaco-evk-sd-card.dtbo";
+		};
+		conf-74 {
+			compatible = "qcom,qcs8275-iot-camx-emmc";
+			fdt = "fdt-monaco-evk.dtb", "fdt-monaco-evk-camx.dtbo",
+			      "fdt-monaco-evk-emmc.dtbo";
+		};
+		conf-75 {
+			compatible = "qcom,qcs8275-iot-subtype3-sd-card";
+			fdt = "fdt-monaco-evk.dtb", "fdt-monaco-evk-ifp-mezzanine.dtbo",
+			      "fdt-monaco-evk-sd-card.dtbo";
+		};
+		conf-76 {
+			compatible = "qcom,qcs8275-iot-subtype3-emmc";
+			fdt = "fdt-monaco-evk.dtb", "fdt-monaco-evk-ifp-mezzanine.dtbo",
+			      "fdt-monaco-evk-emmc.dtbo";
+		};
+		conf-77 {
+			compatible = "qcom,qcs8275-iot-subtype3-staging-emmc";
+			fdt = "fdt-monaco-evk.dtb", "fdt-monaco-evk-ifp-mezzanine.dtbo",
+			      "fdt-monaco-staging.dtbo", "fdt-monaco-evk-staging.dtbo",
+			      "fdt-monaco-evk-emmc.dtbo";
 		};
 
 	};
