@@ -121,6 +121,14 @@
 			data = /incbin/("./arch/arm64/boot/dts/qcom/lemans-evk-camera-csi1-imx577.dtbo");
 			type = "flat_dt";
 		};
+		fdt-lemans-evk-sd-card.dtbo {
+			data = /incbin/("./arch/arm64/boot/dts/qcom/lemans-evk-sd-card.dtbo");
+			type = "flat_dt";
+		};
+		fdt-lemans-evk-emmc.dtbo {
+			data = /incbin/("./arch/arm64/boot/dts/qcom/lemans-evk-emmc.dtbo");
+			type = "flat_dt";
+		};
 		fdt-monaco-evk-camera-imx577.dtbo {
 			data = /incbin/("./arch/arm64/boot/dts/qcom/monaco-evk-camera-imx577.dtbo");
 			type = "flat_dt";
