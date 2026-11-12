@@ -416,6 +416,8 @@ jobs:
           }
           EOF
 
+          cp /tmp/provenance.json output/provenance.json
+
           git clone "https://x-access-token:${GH_PAT}@github.com/qualcomm-linux/qcom-distro-artifacts.git" /tmp/qcom-distro-artifacts
           cd /tmp/qcom-distro-artifacts
           git config user.name "${BOT_NAME}"
