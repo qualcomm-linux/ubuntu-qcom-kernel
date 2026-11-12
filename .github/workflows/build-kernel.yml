@@ -13,7 +13,9 @@
 #
 # Output .deb packages are uploaded ONLY to the S3 bucket
 # (qli-prd-lecore-gh-artifacts), on the lecore-production runner. No GitHub
-# Actions artifacts and no GitHub Releases are produced.
+# Actions artifacts and no GitHub Releases are produced. A provenance entry
+# for the built source package is also pushed to qcom-distro-artifacts,
+# gated on the same condition as the S3 upload.
 
 name: "Build: Canonical Kernel .deb Packages"
 
@@ -362,6 +364,82 @@ jobs:
           if [ -d output/rt ]; then
             echo "Built packages (qcom-rt):"
             ls -lh output/rt/ || echo "(no files found)"
+          fi
+
+      # -----------------------------------------------------------------------
+      # 8b. Publish provenance to qcom-distro-artifacts.
+      #     Restricted to resolute-qcom-devel builds: the only ones ever
+      #     actually shipped. This also excludes premerge-pr.yml (which
+      #     builds a PR merge ref with skip_s3: false) without needing a
+      #     separate check for it. Source package name and version are read
+      #     from the changelog AFTER the local version suffix step above has
+      #     already bumped it, so they match exactly what's in the built
+      #     .deb filenames.
+      # -----------------------------------------------------------------------
+      - name: Publish kernel provenance to qcom-distro-artifacts
+        if: env.BUILD_REF == 'resolute-qcom-devel' && inputs.skip_s3 != true && steps.version-suffix.outputs.applied != 'false'
+        env:
+          GH_PAT:   ${{ secrets.DEB_PKG_BOT_CI_TOKEN }}
+          BOT_NAME: ${{ vars.DEB_PKG_BOT_CI_NAME }}
+          BOT_EMAIL: ${{ vars.DEB_PKG_BOT_CI_EMAIL }}
+          PKG_REPO: ${{ github.repository }}
+          SUITE:    ${{ env.SERIES }}
+        run: |
+          set -euo pipefail
+
+          debian_dir="$(sed -n 's/^DEBIAN=//p' kernel-src/debian/debian.env)"
+          changelog="kernel-src/${debian_dir}/changelog"
+
+          SOURCE_PKG="$(dpkg-parsechangelog -l "${changelog}" --show-field Source)"
+          PKG_VERSION="$(dpkg-parsechangelog -l "${changelog}" --show-field Version)"
+          PKG_REPO_COMMIT="$(git -C kernel-src rev-parse HEAD)"
+
+          # Binary package names actually produced, deduped (output/rt/
+          # intentionally holds copies of some output/ packages).
+          BINARY_PKGS="$(find output -name '*.deb' -exec dpkg-deb --field {} Package \; \
+            | sort -u | jq -R -s -c 'split("\n") | map(select(length>0))')"
+
+          cat > /tmp/provenance.json <<EOF
+          {
+            "${SOURCE_PKG}": {
+              "source_pkg_version": "${PKG_VERSION}",
+              "upstream_type": "source",
+              "upstream_repo": "https://git.launchpad.net/~carmel-team/ubuntu/+source/linux/+git/resolute",
+              "upstream_repo_tag": "",
+              "upstream_repo_commit": "",
+              "pkg_repo": "${PKG_REPO}",
+              "pkg_repo_tag": "${SUITE}/${PKG_VERSION}",
+              "pkg_repo_commit": "${PKG_REPO_COMMIT}",
+              "pkg_repo_branch": "${BUILD_REF}",
+              "binary_pkgs": ${BINARY_PKGS}
+            }
+          }
+          EOF
+
+          git clone "https://x-access-token:${GH_PAT}@github.com/qualcomm-linux/qcom-distro-artifacts.git" /tmp/qcom-distro-artifacts
+          cd /tmp/qcom-distro-artifacts
+          git config user.name "${BOT_NAME}"
+          git config user.email "${BOT_EMAIL}"
+
+          mkdir -p "${SUITE}"
+          SUITE_PROVENANCE="${SUITE}/provenance.json"
+          if [[ -f "${SUITE_PROVENANCE}" ]]; then
+            jq -s --indent 2 '.[0] * .[1]' "${SUITE_PROVENANCE}" /tmp/provenance.json > /tmp/merged_provenance.json
+            mv /tmp/merged_provenance.json "${SUITE_PROVENANCE}"
+          else
+            cp /tmp/provenance.json "${SUITE_PROVENANCE}"
+          fi
+
+          git add "${SUITE_PROVENANCE}"
+          if git diff --cached --quiet; then
+            echo "Provenance unchanged, nothing to commit"
+          else
+            git commit -m "provenance: update ${SOURCE_PKG} ${PKG_VERSION} for ${SUITE}"
+            for attempt in 1 2 3; do
+              git push origin main && break
+              echo "Push attempt ${attempt} failed, rebasing and retrying..."
+              git pull --rebase origin main
+            done
           fi
 
       # -----------------------------------------------------------------------
