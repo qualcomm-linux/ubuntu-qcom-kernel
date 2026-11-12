@@ -1490,6 +1490,8 @@ CONFIG_PCI_LAYERSCAPE                           policy<{'arm64': '-'}>
 CONFIG_PCI_LAYERSCAPE_EP                        policy<{'arm64': '-'}>
 CONFIG_PCI_PWRCTL                               policy<{'arm64': '-'}>
 CONFIG_PCI_PWRCTL_PWRSEQ                        policy<{'arm64': '-'}>
+CONFIG_PCI_PWRCTRL_GENERIC                      policy<{'arm64': 'y'}>
+CONFIG_PCI_PWRCTRL_SLOT                         policy<{'arm64': '-'}>
 CONFIG_PCI_PWRCTRL_TC9563                       policy<{'arm64': 'y'}>
 CONFIG_PCI_SKY1_HOST                            policy<{'arm64': '-'}>
 CONFIG_PCI_TEGRA                                policy<{'arm64': '-'}>
