@@ -1,0 +1,492 @@
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# build-kernel.yml
+#
+# Builds Ubuntu kernel .deb packages from resolute-qcom-devel, the
+# resolute-qcom mirror populated by fetch-source-pkg.yml, or any branch based
+# on them.
+#
+# The build always runs inside the ghcr.io/qualcomm-linux/pkg-builder:<series>
+# container via docker-pkg-build, where <series> is the Ubuntu series the
+# source's changelog declares, ensuring a clean, reproducible environment
+# that exactly matches the target distro.
+#
+# Output .deb packages are uploaded ONLY to the S3 bucket
+# (qli-prd-lecore-gh-artifacts), on the lecore-production runner. No GitHub
+# Actions artifacts and no GitHub Releases are produced. A provenance entry
+# for the built source package is also pushed to qcom-distro-artifacts,
+# gated on the same condition as the S3 upload.
+
+name: "Build: Canonical Kernel .deb Packages"
+
+on:
+  # Daily build at 15:00 PST (23:00 UTC; GitHub cron runs in UTC). A scheduled run
+  # passes no inputs, so it builds resolute-qcom-devel HEAD (the ref default) on
+  # the lecore-production runner and uploads the .deb packages to S3 (skip_s3 is
+  # unset, so the upload step runs).
+  schedule:
+    - cron: "0 23 * * *"
+
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag or commit to build, e.g. resolute-qcom-devel, resolute-qcom, Ubuntu-qcom-7.0.0-1016.19"
+        required: true
+        default: "resolute-qcom-devel"
+        type: string
+      dbgsym:
+        description: "Build the -dbgsym.ddeb debug symbol packages alongside the .deb packages."
+        required: false
+        default: true
+        type: boolean
+      flavours:
+        description: "ALL builds every flavour. Otherwise a space-separated list of flavour names (e.g. 'qcom', 'qcom qcom-rt'), no 'binary-' prefix."
+        required: false
+        default: "ALL"
+        type: string
+
+  workflow_call:
+    inputs:
+      ref:
+        description: "Branch, tag or commit to build (premerge-pr.yml passes the PR merge ref)."
+        required: false
+        default: "resolute-qcom-devel"
+        type: string
+      dbgsym:
+        description: "Build the -dbgsym.ddeb debug symbol packages alongside the .deb packages."
+        required: false
+        default: true
+        type: boolean
+      skip_s3:
+        description: "Skip uploading built .deb packages to S3 (used by premerge-pr.yml for build-only checks)."
+        required: false
+        default: false
+        type: boolean
+      flavours:
+        description: "ALL builds every flavour. Otherwise a space-separated list of flavour names (e.g. 'qcom', 'qcom qcom-rt'), no 'binary-' prefix."
+        required: false
+        default: "ALL"
+        type: string
+      s3_prefix:
+        description: "S3 path prefix under pkg/ (e.g. 'premerge', 'temp'). Callers must pass this explicitly."
+        required: false
+        default: "temp"
+        type: string
+      ci_scripts_ref:
+        description: "Ref to check out scripts/ from. Defaults to main; premerge-main.yml passes the PR merge ref so a PR's own scripts are what get tested."
+        required: false
+        default: "main"
+        type: string
+
+permissions:
+  contents: read    # checkout + tag ls-remote only; output goes to S3
+
+jobs:
+  # --------------------------------------------------------------------------
+  # Job: build
+  # --------------------------------------------------------------------------
+  build:
+    name: "Build"
+    # Runner is always lecore-production for this repo.
+    runs-on: ["self-hosted", "lecore-prd-u2404-arm64-xlrg-od-ephem"]
+    timeout-minutes: 360
+
+    env:
+      BUILD_REF: ${{ inputs.ref || 'resolute-qcom-devel' }}
+      ARCH:    arm64
+      FLAVOURS: ${{ inputs.flavours || 'ALL' }}
+      DBGSYM:  ${{ github.event_name == 'schedule' && 'true' || (inputs.dbgsym && 'true' || 'false') }}
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 2. Extract org/repo for S3 upload path
+      # -----------------------------------------------------------------------
+      - name: Extract org and repo name
+        run: |
+          echo "ORG_NAME=${GITHUB_REPOSITORY%%/*}" >> "$GITHUB_ENV"
+          echo "REPO_NAME=${GITHUB_REPOSITORY#*/}"  >> "$GITHUB_ENV"
+
+      # -----------------------------------------------------------------------
+      # 4. Checkout the kernel source at the requested ref: a branch, a
+      #    verbatim Canonical tag such as Ubuntu-qcom-7.0.0-1016.19, a commit,
+      #    or the PR merge ref premerge-pr.yml passes.
+      #    Note: actions/checkout checks out a ref of THIS repository
+      #    (ubuntu-qcom-kernel). The resolute-qcom* branches of this repo
+      #    contain the full kernel source tree mirrored by
+      #    fetch-source-pkg.yml; they are not the main branch.
+      # -----------------------------------------------------------------------
+      - name: Checkout kernel source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ env.BUILD_REF }}
+          path: kernel-src
+          persist-credentials: false
+
+      # -----------------------------------------------------------------------
+      # 4b. Resolve the Ubuntu series the source targets, which selects the
+      #     pkg-builder image. Read from the changelog the same way Canonical's
+      #     packaging reads it (debian/rules.d/0-common-vars.mk), skipping an
+      #     UNRELEASED entry still being prepared, so any branch builds in the
+      #     image for its release whatever the branch is named.
+      # -----------------------------------------------------------------------
+      - name: Resolve Ubuntu series
+        working-directory: kernel-src
+        run: |
+          set -euo pipefail
+          debian_dir="$(sed -n 's/^DEBIAN=//p' debian/debian.env 2>/dev/null || true)"
+          changelog="${debian_dir}/changelog"
+          if [ -z "${debian_dir}" ] || [ ! -f "${changelog}" ]; then
+            echo "::error::The checked-out source is not an Ubuntu kernel tree: no changelog found through debian/debian.env."
+            exit 1
+          fi
+          series="$(awk '/^[^ ]+ \([^)]+\) / {
+                           d = $3; sub(/;.*/, "", d)
+                           sub(/-(security|updates|proposed)$/, "", d)
+                           if (d != "UNRELEASED") { print d; exit }
+                         }' "${changelog}")"
+          if ! [[ "${series}" =~ ^[a-z]+$ ]]; then
+            echo "::error::Could not read an Ubuntu series from ${changelog}."
+            exit 1
+          fi
+          echo "SERIES=${series}" >> "$GITHUB_ENV"
+          echo "Series: ${series} (from ${changelog})"
+
+      # -----------------------------------------------------------------------
+      # 4c. Local version suffix for any build with commits past the last
+      #     Canonical sync tag, so it's distinguishable from a plain rebuild of
+      #     that tag. Skipped for any build whose HEAD is exactly a Canonical
+      #     tag, such as a tag build or the resolute-qcom mirror. Never fails
+      #     the kernel build itself.
+      #
+      #     Checked out at main by default: CI scripts must come from the
+      #     trusted default branch, not whatever ref is being built. Matters
+      #     most for workflow_call from premerge-pr.yml, where github.sha is
+      #     the caller's resolute-qcom-devel merge commit, not main. The one
+      #     caller that overrides it is premerge-main.yml, whose pull requests
+      #     change the scripts themselves.
+      # -----------------------------------------------------------------------
+      - name: Checkout CI scripts
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ inputs.ci_scripts_ref || 'main' }}
+          # Own path, matching kernel-src and docker-pkg-build: checking out
+          # to the workspace root would clean the whole workspace, deleting
+          # kernel-src.
+          path: ci-scripts
+          persist-credentials: false
+
+      - name: Install host tools for the local version suffix step
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y -o DPkg::Lock::Timeout=300 --no-install-recommends gh jq dpkg-dev
+
+      - name: Apply Qualcomm local version suffix
+        id: version-suffix
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if bash ./ci-scripts/scripts/apply-local-version-suffix.sh; then
+            echo "applied=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "applied=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Local version suffix step failed, so this build carries the released version of the tag it sits on. Packages will not be uploaded."
+          fi
+
+      # -----------------------------------------------------------------------
+      # 5. Checkout docker-pkg-build
+      # -----------------------------------------------------------------------
+      - name: Checkout docker-pkg-build
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          repository: qualcomm-linux/docker-pkg-build
+          ref: main
+          path: docker-pkg-build
+          persist-credentials: false
+
+      # -----------------------------------------------------------------------
+      # 6. Build the pkg-builder docker image for the source's Ubuntu series.
+      #    pkg-builder images are tagged by series only (e.g. resolute).
+      # -----------------------------------------------------------------------
+      - name: Build docker image (pkg-builder:${{ env.SERIES }})
+        run: |
+          ./docker-pkg-build/docker_deb_build.py --rebuild -d "${SERIES}"
+          docker image ls
+
+      # -----------------------------------------------------------------------
+      # 7. Build kernel packages inside the series-matched container
+      #    The workspace is bind-mounted so output .deb files land on the host.
+      # -----------------------------------------------------------------------
+      - name: Build kernel packages (pkg-builder:${{ env.SERIES }})
+        run: |
+          JOBS=$(nproc)
+          FLAVOURS_LC=$(echo "${FLAVOURS}" | tr '[:upper:]' '[:lower:]')
+          # binary-indep is always built alongside the selected flavours —
+          # linux-headers-* and linux-tools-* packages depend on it, so it
+          # can't be made optional here.
+          if [ "${FLAVOURS_LC}" = "all" ]; then
+            RULES_TARGETS="binary"
+          else
+            RULES_TARGETS="binary-indep"
+            for f in ${FLAVOURS_LC}; do
+              RULES_TARGETS="${RULES_TARGETS} binary-${f}"
+            done
+          fi
+
+          echo "Building: ref=${BUILD_REF}  series=${SERIES}  target=${RULES_TARGETS}  arch=${ARCH}  jobs=${JOBS}"
+
+          # IMPORTANT: use single quotes for bash -c so the outer shell does NOT
+          # expand $(...) or ${VAR} before passing the string to docker.
+          # JOBS, RULES_TARGETS, and WS are passed as -e env vars and expanded
+          # inside the container by the container's own bash. The targets are
+          # deliberately not named TARGET: bindgen reads TARGET as a Cargo
+          # target triple and passes it to clang, which disables Rust support.
+          docker run -i --rm \
+            -v "${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}" \
+            --workdir="${GITHUB_WORKSPACE}" \
+            -e JOBS="${JOBS}" \
+            -e RULES_TARGETS="${RULES_TARGETS}" \
+            -e WS="${GITHUB_WORKSPACE}" \
+            -e DBGSYM="${DBGSYM}" \
+            "ghcr.io/qualcomm-linux/pkg-builder:${SERIES}" \
+            bash -c '
+              set -euo pipefail
+
+              # The Qualcomm repository supplies the DKMS module sources. The
+              # image ships both the signing key and a suite-matched sources
+              # file for it, so install those rather than restating the
+              # repository here with trusted=yes.
+              install -D -m644 /tmp/keyrings/qsc-deb-releases.asc \
+                /etc/apt/keyrings/qsc-deb-releases.asc
+              cp /tmp/qsc-deb-releases.sources /etc/apt/sources.list.d/
+
+              apt-get update -qq
+
+              cd kernel-src/
+              echo "debian/debian.env: $(cat debian/debian.env 2>/dev/null || echo NOT FOUND)"
+              ls -la debian/rules && echo "debian/rules: OK" || { echo "debian/rules: NOT FOUND"; exit 1; }
+
+              # Heartbeat every 2 min — kernel build takes 60-90 min with minimal output
+              while true; do echo "[$(date -u +%H:%M:%S)] kernel build still running..."; sleep 120; done &
+              HEARTBEAT=$!
+
+              # Run the clean target to set up the full build environment before
+              # compilation. This is the standard Ubuntu kernel build setup path:
+              #   - runs debian/control as a dependency, generating
+              #     debian/canonical-certs.pem (required by certs/x509_certificate_list)
+              #     and debian/control
+              #   - creates debian/changelog → debian.master/changelog symlink
+              #     (required by dh_installchangelogs at the end of binary-generic)
+              #   - removes any stale build artifacts
+              #
+              # Use "fakeroot make -f debian/rules" rather than "fakeroot debian/rules":
+              # fakeroot is a shell script that execs the command via /bin/sh (dash);
+              # dash resolves the shebang (#!/usr/bin/make -f) and reports "not found"
+              # if make is not yet on PATH at exec time. Invoking make explicitly
+              # bypasses the shebang lookup entirely.
+              echo "=== Setting up build environment (debian/rules clean) ==="
+              fakeroot make -f debian/rules clean
+
+              # Safety net: ensure debian/changelog symlink exists.
+              # The clean target should create it as part of standard setup,
+              # but if it does not (container environment difference), the
+              # build would fail at dh_installchangelogs after 2+ hours.
+              # This guard is a no-op when clean already created the symlink.
+              if [ ! -f debian/changelog ] && [ -f debian.master/changelog ]; then
+                ln -sf ../debian.master/changelog debian/changelog
+                echo "Safety net: created debian/changelog → debian.master/changelog"
+              fi
+
+              # Resolve against the local debian/control just generated by "clean".
+              echo "=== Installing build dependencies from debian/control ==="
+              apt-get build-dep -y ./
+
+              echo "=== Starting: fakeroot debian/rules ${RULES_TARGETS} (jobs=${JOBS}) ==="
+              export DEB_BUILD_OPTIONS="parallel=${JOBS} nocheck"
+              # The config policy and module signature checks run as in the
+              # official Canonical builds, so a config that does not match the
+              # annotations fails here rather than shipping.
+              # do_dbgsym_package=true additionally builds the unstripped
+              # -dbgsym.ddeb (vmlinux + modules with full debug symbols).
+              DBGSYM_OPT="do_dbgsym_package=false"
+              if [ "${DBGSYM}" = "true" ]; then DBGSYM_OPT="do_dbgsym_package=true"; fi
+              fakeroot debian/rules ${RULES_TARGETS} "${DBGSYM_OPT}"
+
+              kill "${HEARTBEAT}" 2>/dev/null || true
+
+              echo "=== Locating built .deb files ==="
+              find "${WS}" -name "*.deb" -o -name "*.ddeb" | sort || true
+            '
+
+      # -----------------------------------------------------------------------
+      # 8. Collect output packages
+      #    The Ubuntu kernel build drops .deb files one level above the
+      #    source tree (i.e. in GITHUB_WORKSPACE, not inside kernel-src/).
+      #    qcom-rt flavour packages are split into output/rt/ so consumers can
+      #    tell the two flavours apart; qcom flavour packages stay in output/.
+      #    output/rt/ is only created on demand (when a qcom-rt artifact is
+      #    actually found below) so a build that didn't select qcom-rt
+      #    doesn't produce an empty/misleading rt directory.
+      #
+      #    linux-qcom-headers-* and linux-qcom-tools-* are "Architecture: all"
+      #    at the source level, so there is a single shared .deb per ABI
+      #    rather than one per flavour, and they land in output/ (they don't
+      #    match the -qcom-rt filename pattern above). linux-headers-*-qcom-rt
+      #    depends on linux-qcom-headers-*, and a future linux-tools-*-qcom-rt
+      #    would similarly depend on linux-qcom-tools-*, so both are also
+      #    copied (not moved — qcom needs its own copy in output/ too) into
+      #    output/rt/ to keep that folder self-contained — but again, only
+      #    if output/rt/ already exists (i.e. qcom-rt was actually built).
+      # -----------------------------------------------------------------------
+      - name: Collect built packages
+        run: |
+          mkdir -p output/
+
+          find "${GITHUB_WORKSPACE}" -maxdepth 1 \
+            \( -name "*.deb" -o -name "*.ddeb" -o -name "*.changes" -o -name "*.buildinfo" \) \
+            -print0 | while IFS= read -r -d '' f; do
+              case "$(basename "$f")" in
+                *-qcom-rt_*|*-qcom-rt-dbgsym_*) mkdir -p output/rt/; cp "$f" output/rt/ ;;
+                *)                              cp "$f" output/ ;;
+              esac
+            done
+
+          if [ -d output/rt ]; then
+            find output -maxdepth 1 \
+              \( -name "linux-qcom-headers-*" -o -name "linux-qcom-tools-*" \) \
+              -print0 | while IFS= read -r -d '' f; do
+                cp "$f" output/rt/
+              done
+          fi
+
+          echo "Built packages (qcom):"
+          ls -lh output/ 2>/dev/null | grep -v '^total\|^d' || echo "(no files found)"
+          if [ -d output/rt ]; then
+            echo "Built packages (qcom-rt):"
+            ls -lh output/rt/ || echo "(no files found)"
+          fi
+
+      # -----------------------------------------------------------------------
+      # 8b. Publish provenance to qcom-distro-artifacts.
+      #     Restricted to resolute-qcom-devel builds: the only ones ever
+      #     actually shipped. This also excludes premerge-pr.yml (which
+      #     builds a PR merge ref with skip_s3: false) without needing a
+      #     separate check for it. Source package name and version are read
+      #     from the changelog AFTER the local version suffix step above has
+      #     already bumped it, so they match exactly what's in the built
+      #     .deb filenames.
+      # -----------------------------------------------------------------------
+      - name: Publish kernel provenance to qcom-distro-artifacts
+        if: env.BUILD_REF == 'resolute-qcom-devel' && inputs.skip_s3 != true && steps.version-suffix.outputs.applied != 'false'
+        env:
+          GH_PAT:   ${{ secrets.DEB_PKG_BOT_CI_TOKEN }}
+          BOT_NAME: ${{ vars.DEB_PKG_BOT_CI_NAME }}
+          BOT_EMAIL: ${{ vars.DEB_PKG_BOT_CI_EMAIL }}
+          PKG_REPO: ${{ github.repository }}
+          SUITE:    ${{ env.SERIES }}
+        run: |
+          set -euo pipefail
+
+          debian_dir="$(sed -n 's/^DEBIAN=//p' kernel-src/debian/debian.env)"
+          changelog="kernel-src/${debian_dir}/changelog"
+
+          SOURCE_PKG="$(dpkg-parsechangelog -l "${changelog}" --show-field Source)"
+          PKG_VERSION="$(dpkg-parsechangelog -l "${changelog}" --show-field Version)"
+          PKG_REPO_COMMIT="$(git -C kernel-src rev-parse HEAD)"
+
+          # Binary package names actually produced, deduped (output/rt/
+          # intentionally holds copies of some output/ packages).
+          BINARY_PKGS="$(find output -name '*.deb' -exec dpkg-deb --field {} Package \; \
+            | sort -u | jq -R -s -c 'split("\n") | map(select(length>0))')"
+
+          cat > /tmp/provenance.json <<EOF
+          {
+            "${SOURCE_PKG}": {
+              "source_pkg_version": "${PKG_VERSION}",
+              "upstream_type": "source",
+              "upstream_repo": "https://git.launchpad.net/~carmel-team/ubuntu/+source/linux/+git/resolute",
+              "upstream_repo_tag": "",
+              "upstream_repo_commit": "",
+              "pkg_repo": "${PKG_REPO}",
+              "pkg_repo_tag": "${SUITE}/${PKG_VERSION}",
+              "pkg_repo_commit": "${PKG_REPO_COMMIT}",
+              "pkg_repo_branch": "${BUILD_REF}",
+              "binary_pkgs": ${BINARY_PKGS}
+            }
+          }
+          EOF
+
+          git clone "https://x-access-token:${GH_PAT}@github.com/qualcomm-linux/qcom-distro-artifacts.git" /tmp/qcom-distro-artifacts
+          cd /tmp/qcom-distro-artifacts
+          git config user.name "${BOT_NAME}"
+          git config user.email "${BOT_EMAIL}"
+
+          mkdir -p "${SUITE}"
+          SUITE_PROVENANCE="${SUITE}/provenance.json"
+          if [[ -f "${SUITE_PROVENANCE}" ]]; then
+            jq -s --indent 2 '.[0] * .[1]' "${SUITE_PROVENANCE}" /tmp/provenance.json > /tmp/merged_provenance.json
+            mv /tmp/merged_provenance.json "${SUITE_PROVENANCE}"
+          else
+            cp /tmp/provenance.json "${SUITE_PROVENANCE}"
+          fi
+
+          git add "${SUITE_PROVENANCE}"
+          if git diff --cached --quiet; then
+            echo "Provenance unchanged, nothing to commit"
+          else
+            git commit -m "provenance: update ${SOURCE_PKG} ${PKG_VERSION} for ${SUITE}"
+            for attempt in 1 2 3; do
+              git push origin main && break
+              echo "Push attempt ${attempt} failed, rebasing and retrying..."
+              git pull --rebase origin main
+            done
+          fi
+
+      # -----------------------------------------------------------------------
+      # 9. Upload to S3 (lecore-production runner only)
+      #    Skipped when skip_s3 is set (premerge-pr.yml build-only checks).
+      #    Destination prefix is the caller-supplied s3_prefix input, not
+      #    inferred from github.event_name: a reusable workflow inherits the
+      #    caller's original event, so it is never actually "workflow_call".
+      # -----------------------------------------------------------------------
+      - name: Upload kernel .deb packages to S3
+        if: inputs.skip_s3 != true && steps.version-suffix.outputs.applied != 'false'
+        uses: qualcomm-linux/upload-private-artifact-action@4940e9327cd7386acdb908b61c714c079b7d754b # aws-v4
+        with:
+          s3_bucket: qli-prd-lecore-gh-artifacts
+          path: ${{ github.workspace }}/output
+          destination: ${{ env.ORG_NAME }}/pkg/${{ inputs.s3_prefix || 'temp' }}/${{ env.REPO_NAME }}/${{ github.run_id }}-${{ github.run_attempt }}/
+
+      # -----------------------------------------------------------------------
+      # 10. Summary
+      # -----------------------------------------------------------------------
+      - name: Print summary
+        if: always()
+        env:
+          RUNNER_NAME: ${{ runner.name }}
+        run: |
+          {
+            echo "## Kernel Build Summary"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Ref          | \`${BUILD_REF}\` |"
+            echo "| Architecture | \`${ARCH}\` |"
+            echo "| Flavour      | \`${FLAVOURS}\` |"
+            echo "| Dbgsym       | \`${DBGSYM}\` |"
+            echo "| Kernel version | \`${KERNEL_LOCAL_VERSION:-unmodified}\` |"
+            echo "| Container    | \`ghcr.io/qualcomm-linux/pkg-builder:${SERIES:-unresolved}\` |"
+            echo "| Runner       | \`${RUNNER_NAME}\` |"
+            echo ""
+            echo "### Built packages (qcom)"
+            echo '```'
+            ls -lh output/ 2>/dev/null | grep -v '^total\|^d' || echo "(none)"
+            echo '```'
+            if [ -d output/rt ]; then
+              echo ""
+              echo "### Built packages (qcom-rt)"
+              echo '```'
+              ls -lh output/rt/
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
