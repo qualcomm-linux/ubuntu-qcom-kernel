@@ -538,6 +538,10 @@ static void hd3ss3220_remove(struct i2c_client *client)
 static int __maybe_unused hd3ss3220_suspend(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
+	struct hd3ss3220 *hd3ss3220 = i2c_get_clientdata(client);
+
+	if (hd3ss3220->poll)
+		cancel_delayed_work_sync(&hd3ss3220->output_poll_work);
 
 	if (device_may_wakeup(dev))
 		enable_irq_wake(client->irq);
@@ -550,11 +554,15 @@ static int __maybe_unused hd3ss3220_suspend(struct device *dev)
 static int __maybe_unused hd3ss3220_resume(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
+	struct hd3ss3220 *hd3ss3220 = i2c_get_clientdata(client);
 
 	if (device_may_wakeup(dev))
 		disable_irq_wake(client->irq);
 	else
 		enable_irq(client->irq);
+
+	if (hd3ss3220->poll)
+		schedule_delayed_work(&hd3ss3220->output_poll_work, HZ);
 
 	return 0;
 }
