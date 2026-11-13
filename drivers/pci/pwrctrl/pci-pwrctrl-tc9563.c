@@ -9,6 +9,7 @@
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/gpio/consumer.h>
+#include <linux/gpio/machine.h>
 #include <linux/i2c.h>
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
@@ -58,8 +59,7 @@
 #define TC9563_POWER_CONTROL		0x82b09c
 #define TC9563_POWER_CONTROL_OVREN	0x82b2c8
 
-#define TC9563_GPIO_MASK		0xfffffff3
-#define TC9563_GPIO_DEASSERT_BITS	0xc  /* Clear to deassert GPIO */
+#define TC9563_GPIO_NONE		(-1)
 
 #define TC9563_TX_MARGIN_MIN_UA		400000
 
@@ -92,6 +92,10 @@ struct tc9563_pwrctrl_cfg {
 	u8 nfts[2]; /* GEN1 & GEN2 */
 	bool disable_dfe;
 	bool disable_port;
+	int ep_reset_gpio;
+	u32 ep_reset_gpio_flags;
+	int ep_pwr_en_gpio;
+	u32 ep_pwr_en_gpio_flags;
 };
 
 #define TC9563_PWRCTL_MAX_SUPPLY	6
@@ -401,19 +405,101 @@ static int tc9563_pwrctrl_set_nfts(struct tc9563_pwrctrl *tc9563,
 					     ARRAY_SIZE(nfts_seq));
 }
 
-static int tc9563_pwrctrl_assert_deassert_reset(struct tc9563_pwrctrl *tc9563,
-						bool deassert)
+static int tc9563_pwrctrl_gpio_set(struct tc9563_pwrctrl *tc9563, int gpio,
+				   u32 flags, bool active)
 {
-	int ret, val;
+	u32 mask, val;
+	int ret;
 
-	ret = tc9563_pwrctrl_i2c_write(tc9563->client, TC9563_GPIO_CONFIG,
-				       TC9563_GPIO_MASK);
+	if (gpio == TC9563_GPIO_NONE)
+		return 0;
+
+	if (gpio < 0 || gpio >= 32)
+		return -EINVAL;
+
+	mask = BIT(gpio);
+
+	ret = tc9563_pwrctrl_i2c_read(tc9563->client, TC9563_GPIO_CONFIG,
+				      &val);
 	if (ret)
 		return ret;
 
-	val = deassert ? TC9563_GPIO_DEASSERT_BITS : 0;
+	val &= ~mask;
+	ret = tc9563_pwrctrl_i2c_write(tc9563->client, TC9563_GPIO_CONFIG,
+				      val);
+	if (ret)
+		return ret;
 
-	return tc9563_pwrctrl_i2c_write(tc9563->client, TC9563_RESET_GPIO, val);
+	ret = tc9563_pwrctrl_i2c_read(tc9563->client, TC9563_RESET_GPIO,
+				      &val);
+	if (ret)
+		return ret;
+
+	if (active ^ !!(flags & GPIO_ACTIVE_LOW))
+		val |= mask;
+	else
+		val &= ~mask;
+
+	return tc9563_pwrctrl_i2c_write(tc9563->client, TC9563_RESET_GPIO,
+				       val);
+}
+
+static int tc9563_pwrctrl_parse_gpio(struct device_node *node,
+				     const char *property, int *gpio,
+				     u32 *flags)
+{
+	struct of_phandle_args args;
+	int ret;
+
+	ret = of_parse_phandle_with_fixed_args(node, property, 2, 0, &args);
+	if (ret == -ENOENT)
+		return 0;
+	if (ret)
+		return ret;
+
+	if (args.args[0] >= 32) {
+		ret = -EINVAL;
+	} else {
+		*gpio = args.args[0];
+		*flags = args.args[1];
+	}
+
+	of_node_put(args.np);
+	return ret;
+}
+
+static int tc9563_pwrctrl_ep_pwr_en(struct tc9563_pwrctrl *tc9563,
+				    struct tc9563_pwrctrl_cfg *cfg,
+				    bool enable)
+{
+	return tc9563_pwrctrl_gpio_set(tc9563, cfg->ep_pwr_en_gpio,
+				       cfg->ep_pwr_en_gpio_flags, enable);
+}
+
+static int tc9563_pwrctrl_ep_assert_deassert_reset(struct tc9563_pwrctrl *tc9563,
+						   enum tc9563_pwrctrl_ports port,
+						   struct tc9563_pwrctrl_cfg *cfg,
+						   bool deassert)
+{
+	int gpio = cfg->ep_reset_gpio;
+	u32 flags = cfg->ep_reset_gpio_flags;
+
+	if (gpio == TC9563_GPIO_NONE) {
+		switch (port) {
+		case TC9563_DSP1:
+			gpio = 2;
+			break;
+		case TC9563_DSP2:
+			gpio = 3;
+			break;
+		default:
+			return 0;
+		}
+
+		flags = GPIO_ACTIVE_LOW;
+	}
+
+	return tc9563_pwrctrl_gpio_set(tc9563, gpio, flags, !deassert);
 }
 
 static int tc9563_pwrctrl_parse_device_dt(struct tc9563_pwrctrl *tc9563,
@@ -422,6 +508,9 @@ static int tc9563_pwrctrl_parse_device_dt(struct tc9563_pwrctrl *tc9563,
 {
 	struct tc9563_pwrctrl_cfg *cfg = &tc9563->cfg[port];
 	int ret;
+
+	cfg->ep_reset_gpio = TC9563_GPIO_NONE;
+	cfg->ep_pwr_en_gpio = TC9563_GPIO_NONE;
 
 	/* Disable port if the status of the port is disabled. */
 	if (!of_device_is_available(node)) {
@@ -435,6 +524,18 @@ static int tc9563_pwrctrl_parse_device_dt(struct tc9563_pwrctrl *tc9563,
 
 	ret = of_property_read_u32(node, "aspm-l1-entry-delay-ns", &cfg->l1_delay);
 	if (ret && ret != -EINVAL)
+		return ret;
+
+	ret = tc9563_pwrctrl_parse_gpio(node, "ep-pwr-en-gpios",
+					&cfg->ep_pwr_en_gpio,
+					&cfg->ep_pwr_en_gpio_flags);
+	if (ret)
+		return ret;
+
+	ret = tc9563_pwrctrl_parse_gpio(node, "reset-gpios",
+					&cfg->ep_reset_gpio,
+					&cfg->ep_reset_gpio_flags);
+	if (ret)
 		return ret;
 
 	ret = of_property_read_u32(node, "toshiba,tx-amplitude-microvolt", &cfg->tx_amp);
@@ -479,15 +580,24 @@ static int tc9563_pwrctrl_power_on(struct pci_pwrctrl *pwrctrl)
 
 	fsleep(TC9563_OSC_STAB_DELAY_US);
 
-	ret = tc9563_pwrctrl_assert_deassert_reset(tc9563, false);
-	if (ret)
-		goto power_off;
-
 	for (i = 0; i < TC9563_MAX; i++) {
 		cfg = &tc9563->cfg[i];
 		ret = tc9563_pwrctrl_disable_port(tc9563, i);
 		if (ret) {
 			dev_err(dev, "Disabling port failed\n");
+			goto power_off;
+		}
+
+		ret = tc9563_pwrctrl_ep_assert_deassert_reset(tc9563, i, cfg,
+							      false);
+		if (ret) {
+			dev_err(dev, "Assert EP reset failed\n");
+			goto power_off;
+		}
+
+		ret = tc9563_pwrctrl_ep_pwr_en(tc9563, cfg, true);
+		if (ret) {
+			dev_err(dev, "Enabling EP power failed\n");
 			goto power_off;
 		}
 
@@ -520,11 +630,16 @@ static int tc9563_pwrctrl_power_on(struct pci_pwrctrl *pwrctrl)
 			dev_err(dev, "Disabling DFE failed\n");
 			goto power_off;
 		}
+
+		ret = tc9563_pwrctrl_ep_assert_deassert_reset(tc9563, i, cfg,
+							      true);
+		if (ret) {
+			dev_err(dev, "Deassert EP reset failed\n");
+			goto power_off;
+		}
 	}
 
-	ret = tc9563_pwrctrl_assert_deassert_reset(tc9563, true);
-	if (!ret)
-		return 0;
+	return 0;
 
 power_off:
 	tc9563_pwrctrl_power_off(&tc9563->pwrctrl);
@@ -592,6 +707,9 @@ static int tc9563_pwrctrl_probe(struct platform_device *pdev)
 	 * and so on.
 	 */
 	for_each_child_of_node_scoped(node, child) {
+		if (port + 1 >= TC9563_MAX)
+			break;
+
 		port++;
 		ret = tc9563_pwrctrl_parse_device_dt(tc9563, child, port);
 		if (ret)
@@ -599,6 +717,9 @@ static int tc9563_pwrctrl_probe(struct platform_device *pdev)
 		/* Embedded ethernet device are under DSP3 */
 		if (port == TC9563_DSP3) {
 			for_each_child_of_node_scoped(child, child1) {
+				if (port + 1 >= TC9563_MAX)
+					break;
+
 				port++;
 				ret = tc9563_pwrctrl_parse_device_dt(tc9563,
 								child1, port);
