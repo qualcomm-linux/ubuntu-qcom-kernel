@@ -662,6 +662,8 @@ CONFIG_CORESIGHT_TNOC                           policy<{'arm64': 'm'}>
 CONFIG_CORESIGHT_TPDA                           policy<{'arm64': 'm'}>
 CONFIG_CORESIGHT_TPDM                           policy<{'arm64': 'm'}>
 CONFIG_CORESIGHT_TRBE                           policy<{'arm64': 'n'}>
+CONFIG_CPU_IDLE_GOV_MENU                        policy<{'arm64': 'n'}>
+CONFIG_CPU_IDLE_GOV_TEO                         policy<{'arm64': 'y'}>
 CONFIG_CPUFREQ_DT_RUST                          policy<{'arm64': '-'}>
 CONFIG_CPUMASK_OFFSTACK                         policy<{'arm64': '-'}>
 CONFIG_CRC7                                     policy<{'arm64': 'y'}>
