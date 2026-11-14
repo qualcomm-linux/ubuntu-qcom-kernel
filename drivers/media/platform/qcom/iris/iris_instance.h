@@ -27,11 +27,8 @@ enum iris_fmt_type_out {
 enum iris_fmt_type_cap {
 	IRIS_FMT_NV12,
 	IRIS_FMT_QC08C,
-};
-
-struct iris_fmt {
-	u32 pixfmt;
-	u32 type;
+	IRIS_FMT_TP10,
+	IRIS_FMT_QC10C,
 };
 
 /**

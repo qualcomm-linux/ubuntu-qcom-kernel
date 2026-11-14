@@ -81,38 +81,6 @@ disable_power:
 	iris_vpu_power_off_hw(core);
 }
 
-static int iris_vpu3_purwa_power_on_hw(struct iris_core *core)
-{
-	int ret;
-
-	ret = iris_enable_power_domains(core, IRIS_VCODEC_POWER_DOMAIN);
-	if (ret)
-		return ret;
-
-	ret = iris_prepare_enable_clock(core, IRIS_VCODEC_CLK);
-	if (ret)
-		goto err_disable_power;
-
-	ret = iris_prepare_enable_clock(core, IRIS_BSE_HW_CLK);
-	if (ret)
-		goto err_disable_hw_clock;
-
-	return 0;
-
-err_disable_hw_clock:
-	iris_disable_unprepare_clock(core, IRIS_VCODEC_CLK);
-err_disable_power:
-	iris_disable_power_domains(core, IRIS_VCODEC_POWER_DOMAIN);
-
-	return ret;
-}
-
-static void iris_vpu3_purwa_power_off_hardware(struct iris_core *core)
-{
-	iris_vpu3_power_off_hardware(core);
-	iris_disable_unprepare_clock(core, IRIS_BSE_HW_CLK);
-}
-
 static void iris_vpu33_power_off_hardware(struct iris_core *core)
 {
 	bool handshake_done = false, handshake_busy = false;
@@ -417,15 +385,6 @@ error_disable_hwmode:
 const struct vpu_ops iris_vpu3_ops = {
 	.power_off_hw = iris_vpu3_power_off_hardware,
 	.power_on_hw = iris_vpu_power_on_hw,
-	.power_off_controller = iris_vpu_power_off_controller,
-	.power_on_controller = iris_vpu_power_on_controller,
-	.calc_freq = iris_vpu3x_vpu4x_calculate_frequency,
-	.set_hwmode = iris_vpu_set_hwmode,
-};
-
-const struct vpu_ops iris_vpu3_purwa_ops = {
-	.power_off_hw = iris_vpu3_purwa_power_off_hardware,
-	.power_on_hw = iris_vpu3_purwa_power_on_hw,
 	.power_off_controller = iris_vpu_power_off_controller,
 	.power_on_controller = iris_vpu_power_on_controller,
 	.calc_freq = iris_vpu3x_vpu4x_calculate_frequency,
