@@ -121,6 +121,22 @@
 			data = /incbin/("./arch/arm64/boot/dts/qcom/lemans-evk-camera-csi1-imx577.dtbo");
 			type = "flat_dt";
 		};
+		fdt-lemans-evk-emmc.dtbo {
+			data = /incbin/("./arch/arm64/boot/dts/qcom/lemans-evk-emmc.dtbo");
+			type = "flat_dt";
+		};
+		fdt-lemans-evk-sd-card.dtbo {
+			data = /incbin/("./arch/arm64/boot/dts/qcom/lemans-evk-sd-card.dtbo");
+			type = "flat_dt";
+		};
+		fdt-lemans-evk-staging.dtbo {
+			data = /incbin/("./arch/arm64/boot/dts/qcom/lemans-evk-staging.dtbo");
+			type = "flat_dt";
+		};
+		fdt-lemans-staging.dtbo {
+			data = /incbin/("./arch/arm64/boot/dts/qcom/lemans-staging.dtbo");
+			type = "flat_dt";
+		};
 		fdt-monaco-evk-camera-imx577.dtbo {
 			data = /incbin/("./arch/arm64/boot/dts/qcom/monaco-evk-camera-imx577.dtbo");
 			type = "flat_dt";
@@ -400,6 +416,32 @@
 		conf-69 {
 			compatible = "qcom,mahua-crd";
 			fdt = "fdt-mahua-crd.dtb";
+		};
+		conf-70 {
+			compatible = "qcom,qcs9075-iot-sd-card";
+			fdt = "fdt-lemans-evk.dtb", "fdt-lemans-evk-camera-csi1-imx577.dtbo",
+			      "fdt-lemans-evk-sd-card.dtbo";
+		};
+		conf-71 {
+			compatible = "qcom,qcs9075-iot-camx-sd-card";
+			fdt = "fdt-lemans-evk.dtb", "fdt-lemans-evk-camx.dtbo",
+			      "fdt-lemans-evk-sd-card.dtbo";
+		};
+		conf-72 {
+			compatible = "qcom,qcs9075-iot-subtype1-sd-card";
+			fdt = "fdt-lemans-evk.dtb", "fdt-lemans-evk-ifp-mezzanine.dtbo",
+			      "fdt-lemans-evk-sd-card.dtbo";
+		};
+		conf-73 {
+			compatible = "qcom,qcs9075-iot-subtype1-emmc";
+			fdt = "fdt-lemans-evk.dtb", "fdt-lemans-evk-ifp-mezzanine.dtbo",
+			      "fdt-lemans-evk-emmc.dtbo";
+		};
+		conf-74 {
+			compatible = "qcom,qcs9075-iot-subtype1-staging-emmc";
+			fdt = "fdt-lemans-evk.dtb", "fdt-lemans-evk-ifp-mezzanine.dtbo",
+			      "fdt-lemans-evk-staging.dtbo", "fdt-lemans-staging.dtbo",
+			      "fdt-lemans-evk-emmc.dtbo";
 		};
 
 	};
