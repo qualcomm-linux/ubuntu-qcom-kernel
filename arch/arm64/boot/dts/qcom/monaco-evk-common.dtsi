@@ -508,6 +508,7 @@
 		reg = <0x47>;
 
 		interrupts = <45 IRQ_TYPE_EDGE_FALLING>;
+		wakeup-source;
 
 		id-gpios = <&tlmm 13 GPIO_ACTIVE_HIGH>;
 
