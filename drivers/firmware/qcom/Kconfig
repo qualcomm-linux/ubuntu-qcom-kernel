@@ -10,6 +10,14 @@ config QCOM_SCM
 	select QCOM_TZMEM
 	tristate
 
+config QCOM_PAS
+	tristate
+	select QCOM_SCM
+	help
+	  Compatibility symbol for drivers that use the generic Qualcomm PAS
+	  API. The API is provided by include/linux/firmware/qcom/qcom_pas.h
+	  on top of the SCM PAS implementation.
+
 config QCOM_TZMEM
 	tristate
 	select GENERIC_ALLOCATOR
