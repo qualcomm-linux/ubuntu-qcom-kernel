@@ -7,6 +7,7 @@
 #include <media/v4l2-mem2mem.h>
 
 #include "iris_instance.h"
+#include "iris_vpu_common.h"
 #include "iris_utils.h"
 
 bool iris_res_is_less_than(u32 width, u32 height,
@@ -23,13 +24,20 @@ bool iris_res_is_less_than(u32 width, u32 height,
 	return false;
 }
 
-int iris_get_mbpf(struct iris_inst *inst)
+u32 iris_get_mbpf(struct iris_inst *inst)
 {
 	struct v4l2_format *inp_f = inst->fmt_src;
 	u32 height = max(inp_f->fmt.pix_mp.height, inst->crop.height);
 	u32 width = max(inp_f->fmt.pix_mp.width, inst->crop.width);
 
 	return NUM_MBS_PER_FRAME(height, width);
+}
+
+u32 iris_get_mbps(struct iris_inst *inst)
+{
+	u32 fps = max(inst->frame_rate, inst->operating_rate);
+
+	return iris_get_mbpf(inst) * fps;
 }
 
 bool iris_split_mode_enabled(struct iris_inst *inst)
@@ -94,6 +102,12 @@ struct iris_inst *iris_get_instance(struct iris_core *core, u32 session_id)
 	mutex_lock(&core->lock);
 	list_for_each_entry(inst, &core->instances, list) {
 		if (inst->session_id == session_id) {
+			/*
+			 * Take a reference under core->lock, paired with
+			 * iris_inst_put() once the caller is done, so the
+			 * instance cannot be freed by a concurrent close().
+			 */
+			kref_get(&inst->kref);
 			mutex_unlock(&core->lock);
 			return inst;
 		}
@@ -103,58 +117,17 @@ struct iris_inst *iris_get_instance(struct iris_core *core, u32 session_id)
 	return NULL;
 }
 
-static u32 iris_get_mbps(struct iris_inst *inst)
+static int iris_check_core_load(struct iris_inst *inst, bool mbpf)
 {
-	u32 fps = max(inst->frame_rate, inst->operating_rate);
+	const struct iris_platform_data *platform_data = inst->core->iris_platform_data;
+	u32 max_load = mbpf ? platform_data->max_core_mbpf : platform_data->max_core_mbps;
+	struct iris_inst *instance;
+	u32 total_load = 0;
 
-	return iris_get_mbpf(inst) * fps;
-}
+	list_for_each_entry(instance, &inst->core->instances, list)
+		total_load += mbpf ? iris_get_mbpf(instance) : iris_get_mbps(instance);
 
-static void iris_get_core_load(struct iris_core *core, u32 *core_load, u32 *core_session, bool mbpf)
-{
-	bool dual_core = core->iris_platform_data->dual_core;
-	struct iris_inst *inst;
-	u32 load;
-
-	core_load[0] = 0;
-	core_load[1] = 0;
-	core_session[0] = 0;
-	core_session[1] = 0;
-
-	list_for_each_entry(inst, &core->instances, list) {
-		if (mbpf)
-			load = iris_get_mbpf(inst);
-		else
-			load = iris_get_mbps(inst);
-
-		if (inst->core_id == IRIS_VCODEC0) {
-			core_load[0] += load;
-			core_session[0]++;
-		} else if (dual_core && inst->core_id == IRIS_VCODEC1) {
-			core_load[1] += load;
-			core_session[1]++;
-		}
-	}
-}
-
-static int iris_select_core_id(struct iris_inst *inst, u32 *core_load, u32 *core_session,
-			       u32 max_load, u32 new_load)
-{
-	u32 max_session = inst->core->iris_platform_data->max_session_count;
-	bool dual_core = inst->core->iris_platform_data->dual_core;
-	u32 core_index;
-
-	core_index = (core_load[0] > core_load[1] && dual_core) ? 1 : 0;
-
-	if (core_session[core_index] >= max_session)
-		core_index = core_index == 0 && dual_core ? 1 : 0;
-
-	if (core_session[core_index] >= max_session)
-		return -ENOMEM;
-
-	if (core_load[core_index] + new_load <= max_load)
-		inst->core_id = core_index == 0 ? IRIS_VCODEC0 : IRIS_VCODEC1;
-	else
+	if (total_load > max_load)
 		return -ENOMEM;
 
 	return 0;
@@ -162,16 +135,15 @@ static int iris_select_core_id(struct iris_inst *inst, u32 *core_load, u32 *core
 
 int iris_check_core_mbpf(struct iris_inst *inst)
 {
-	u32 max_core_mbpf = inst->core->iris_platform_data->max_core_mbpf;
-	u32 core_mbpf[2], core_session[2], new_mbpf;
+	const struct vpu_ops *vpu_ops = inst->core->iris_platform_data->vpu_ops;
 	struct iris_core *core = inst->core;
 	int ret;
 
 	mutex_lock(&core->lock);
-	inst->core_id = 0;
-	iris_get_core_load(inst->core, core_mbpf, core_session, true);
-	new_mbpf = iris_get_mbpf(inst);
-	ret = iris_select_core_id(inst, core_mbpf, core_session, max_core_mbpf, new_mbpf);
+	if (vpu_ops->check_core_load)
+		ret = vpu_ops->check_core_load(inst, true);
+	else
+		ret = iris_check_core_load(inst, true);
 	mutex_unlock(&core->lock);
 
 	return ret;
@@ -179,16 +151,15 @@ int iris_check_core_mbpf(struct iris_inst *inst)
 
 int iris_check_core_mbps(struct iris_inst *inst)
 {
-	u32 max_core_mbps = inst->core->iris_platform_data->max_core_mbps;
-	u32 core_mbps[2] = {0, 0}, core_session[2], new_mbps;
+	const struct vpu_ops *vpu_ops = inst->core->iris_platform_data->vpu_ops;
 	struct iris_core *core = inst->core;
 	int ret;
 
 	mutex_lock(&core->lock);
-	inst->core_id = 0;
-	iris_get_core_load(inst->core, core_mbps, core_session, false);
-	new_mbps = iris_get_mbps(inst);
-	ret = iris_select_core_id(inst, core_mbps, core_session, max_core_mbps, new_mbps);
+	if (vpu_ops->check_core_load)
+		ret = vpu_ops->check_core_load(inst, false);
+	else
+		ret = iris_check_core_load(inst, false);
 	mutex_unlock(&core->lock);
 
 	return ret;

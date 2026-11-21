@@ -39,6 +39,10 @@ struct iris_inst;
 #define MAX_HEVC_VBR_LAYER_HP_SLIDING_WINDOW	5
 #define MAX_HIER_CODING_LAYER_GEN1		6
 
+#define BITRATE_MAX_AR50LT		100000000
+#define BITRATE_DEFAULT_AR50LT		20000000
+#define MIN_QP_8BIT_AR50LT		0
+
 #define VIDEO_REGION_SECURE_FW_REGION_ID	0
 #define VIDEO_REGION_VM0_SECURE_NP_ID		1
 #define VIDEO_REGION_VM0_NONSECURE_NP_ID	5
@@ -55,11 +59,20 @@ enum pipe_type {
 };
 
 extern const struct iris_firmware_data iris_hfi_gen1_data;
+extern const struct iris_firmware_data iris_hfi_gen1_ar50lt_data;
 extern const struct iris_firmware_data iris_hfi_gen2_data;
+extern const struct iris_firmware_data iris_hfi_milos_data;
+extern const struct iris_firmware_data iris_hfi_gen2_ar50lt_data;
 extern const struct platform_inst_slice_caps iris_vpu2_vpu3x_slice_caps;
+extern const struct platform_inst_slice_caps iris_ar50lt_slice_caps;
 
+extern const struct iris_platform_data eliza_data;
 extern const struct iris_platform_data glymur_data;
+extern const struct iris_platform_data hawi_data;
 extern const struct iris_platform_data kaanapali_data;
+extern const struct iris_platform_data maili_data;
+extern const struct iris_platform_data milos_data;
+extern const struct iris_platform_data qcm2290_data;
 extern const struct iris_platform_data qcs8300_data;
 extern const struct iris_platform_data sc7280_data;
 extern const struct iris_platform_data sm8250_data;
@@ -67,29 +80,6 @@ extern const struct iris_platform_data sm8550_data;
 extern const struct iris_platform_data sm8650_data;
 extern const struct iris_platform_data sm8750_data;
 extern const struct iris_platform_data x1p42100_data;
-
-enum platform_clk_type {
-	IRIS_AXI_VCODEC_CLK,
-	IRIS_CTRL_CLK,
-	IRIS_AHB_CLK,
-	IRIS_VCODEC_CLK,
-	IRIS_VCODEC_AHB_CLK,
-	IRIS_AXI_CTRL_CLK,
-	IRIS_CTRL_FREERUN_CLK,
-	IRIS_VCODEC_FREERUN_CLK,
-	IRIS_BSE_HW_CLK,
-	IRIS_VPP0_HW_CLK,
-	IRIS_VPP1_HW_CLK,
-	IRIS_APV_HW_CLK,
-	IRIS_AXI_VCODEC1_CLK,
-	IRIS_VCODEC1_CLK,
-	IRIS_VCODEC1_FREERUN_CLK,
-};
-
-struct platform_clk_data {
-	enum platform_clk_type clk_type;
-	const char *clk_name;
-};
 
 struct tz_cp_config {
 	u32 cp_start;
@@ -205,6 +195,7 @@ enum platform_inst_fw_cap_type {
 	LAYER4_BITRATE_HEVC,
 	LAYER5_BITRATE_HEVC,
 	REQUEST_SYNC_FRAME,
+	TIME_DELTA_BASED_RC,
 	SLICE_MODE,
 	SLICE_MAX_BYTES,
 	SLICE_MAX_MB,
@@ -253,19 +244,20 @@ struct icc_vote_data {
 	u32 fps;
 };
 
-enum platform_pm_domain_type {
-	IRIS_CTRL_POWER_DOMAIN,
-	IRIS_VCODEC_POWER_DOMAIN,
-	IRIS_VPP0_HW_POWER_DOMAIN,
-	IRIS_VPP1_HW_POWER_DOMAIN,
-	IRIS_APV_HW_POWER_DOMAIN,
-	IRIS_VCODEC1_POWER_DOMAIN,
+struct iris_power_domain_data {
+	const char * const *pd_names;
+	unsigned int pd_cnt;
+	const char * const *clk_names;
+	unsigned int clk_cnt;
 };
 
 struct iris_firmware_data {
 	void (*init_hfi_ops)(struct iris_core *core);
 
 	u32 core_arch;
+
+	/* Query buffer sizes from the firmware (pre-Iris HFI Gen1 platforms). */
+	bool query_buffer_requirements;
 
 	const struct platform_inst_fw_cap *inst_fw_caps_dec;
 	u32 inst_fw_caps_dec_size;
@@ -314,29 +306,24 @@ struct iris_firmware_desc {
 	const char *fwname;
 };
 
-struct platform_pd_data {
-	enum platform_pm_domain_type *pd_types;
-	const char **pd_names;
-	u32 pd_count;
-};
-
 struct iris_platform_data {
 	const struct iris_firmware_desc *firmware_desc_gen1, *firmware_desc_gen2;
 
 	const struct vpu_ops *vpu_ops;
-
-	int (*init_cb_devs)(struct iris_core *core);
-	void (*deinit_cb_devs)(struct iris_core *core);
 	const struct icc_info *icc_tbl;
 	unsigned int icc_tbl_size;
 	const struct bw_info *bw_tbl_dec;
 	unsigned int bw_tbl_dec_size;
-	const struct platform_pd_data *pmdomain_tbl;
+	const struct iris_power_domain_data *ctrl_data;
+	const struct iris_power_domain_data *vcodec_data;
+	const struct iris_power_domain_data *vcodec_vpp0_data;
+	const struct iris_power_domain_data *vcodec_vpp1_data;
+	const struct iris_power_domain_data *apv_data;
+	const struct iris_power_domain_data *mm_int_data;
+	const struct iris_power_domain_data *cx_int_data;
 	const char * const *opp_pd_tbl;
 	unsigned int opp_pd_tbl_size;
-	const struct platform_clk_data *clk_tbl;
 	const char * const *opp_clk_tbl;
-	unsigned int clk_tbl_size;
 	const char * const *clk_rst_tbl;
 	unsigned int clk_rst_tbl_size;
 	const char * const *controller_rst_tbl;
@@ -350,12 +337,15 @@ struct iris_platform_data {
 	u32 tz_cp_config_data_size;
 	u32 num_vpp_pipe;
 	bool no_aon;
+	bool no_rpmh;
+	u32 wd_intr_mask;
+	u32 icc_ib_multiplier;
 	u32 max_session_count;
+	u32 num_cores;
 	/* max number of macroblocks per frame supported */
 	u32 max_core_mbpf;
 	/* max number of macroblocks per second supported */
 	u32 max_core_mbps;
-	bool dual_core;
 };
 
 #endif

@@ -5,26 +5,47 @@
 
 #include "iris_core.h"
 #include "iris_platform_common.h"
-#include "iris_platform_glymur.h"
 
-const struct platform_clk_data iris_glymur_clk_table[] = {
-	{IRIS_AXI_VCODEC_CLK,		"iface"			},
-	{IRIS_CTRL_CLK,			"core"			},
-	{IRIS_VCODEC_CLK,		"vcodec0_core"		},
-	{IRIS_AXI_CTRL_CLK,		"iface1"		},
-	{IRIS_CTRL_FREERUN_CLK,		"core_freerun"		},
-	{IRIS_VCODEC_FREERUN_CLK,	"vcodec0_core_freerun"	},
-	{IRIS_AXI_VCODEC1_CLK,		"iface2"		},
-	{IRIS_VCODEC1_CLK,		"vcodec1_core"		},
-	{IRIS_VCODEC1_FREERUN_CLK,	"vcodec1_core_freerun"	},
+const struct iris_power_domain_data iris_glymur_ctrl_data = {
+	.pd_names = (const char *[]) {
+		"venus",
+	},
+	.pd_cnt = 1,
+	.clk_names = (const char *[]) {
+		"core_iface", "core_freerun", "core",
+	},
+	.clk_cnt = 3,
+};
+
+const struct iris_power_domain_data iris_glymur_vcodec_data[] = {
+	{
+		.pd_names = (const char *[]) {
+			"vcodec0",
+		},
+		.pd_cnt = 1,
+		.clk_names = (const char *[]) {
+			"vcodec0_iface", "vcodec0_core_freerun", "vcodec0_core",
+		},
+		.clk_cnt = 3,
+	},
+	{
+		.pd_names = (const char *[]) {
+			"vcodec1",
+		},
+		.pd_cnt = 1,
+		.clk_names = (const char *[]) {
+			"vcodec1_iface", "vcodec1_core_freerun", "vcodec1_core",
+		},
+		.clk_cnt = 3,
+	},
 };
 
 const char * const iris_glymur_clk_reset_table[] = {
-	"bus0",
-	"bus1",
+	"core_bus",
+	"vcodec0_bus",
 	"core",
 	"vcodec0_core",
-	"bus2",
+	"vcodec1_bus",
 	"vcodec1_core",
 };
 
@@ -33,20 +54,6 @@ const char * const iris_glymur_opp_clk_table[] = {
 	"vcodec1_core",
 	"core",
 	NULL,
-};
-
-const struct platform_pd_data iris_glymur_pmdomain_table = {
-	.pd_types = (enum platform_pm_domain_type []) {
-		IRIS_CTRL_POWER_DOMAIN,
-		IRIS_VCODEC_POWER_DOMAIN,
-		IRIS_VCODEC1_POWER_DOMAIN,
-	},
-	.pd_names = (const char *[]) {
-		"venus",
-		"vcodec0",
-		"vcodec1",
-	},
-	.pd_count = 3,
 };
 
 const struct tz_cp_config iris_glymur_tz_cp_config[] = {

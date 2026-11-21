@@ -668,16 +668,6 @@
 			reg = <0x0 0xb4702000 0x0 0x40000>;
 			no-map;
 		};
-
-		/*
-		 * The Iris VPU reserves IOVA below 0x25800000 (600MB),
-		 * DMA into that range triggers unhandled SMMU faults and
-		 * spontaneous reboots, so reserve it to keep IOMMU
-		 * allocation above this boundary.
-		 */
-		iris_iova: iris-iova {
-			iommu-addresses = <&iris 0x0 0x0 0x0 0x25800000>;
-		};
 	};
 
 	smp2p-cdsp {
@@ -3059,7 +3049,7 @@
 				      "vcodec0_core",
 				      "vcodec0_bus";
 
-			memory-region = <&video_mem>, <&iris_iova>;
+			memory-region = <&video_mem>;
 			interconnects = <&mmnrt_virt MASTER_VIDEO_P0 RPM_ALWAYS_TAG
 					 &mc_virt SLAVE_EBI_CH0 RPM_ALWAYS_TAG>,
 					<&mem_noc MASTER_AMPSS_M0 RPM_ACTIVE_TAG

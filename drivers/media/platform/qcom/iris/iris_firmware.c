@@ -3,23 +3,20 @@
  * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
-#include <linux/device.h>
 #include <linux/firmware.h>
+#include <linux/firmware/qcom/qcom_pas.h>
 #include <linux/firmware/qcom/qcom_scm.h>
 #include <linux/iommu.h>
-#include <linux/of.h>
 #include <linux/of_address.h>
-#include <linux/of_device.h>
 #include <linux/of_reserved_mem.h>
-#include <linux/platform_device.h>
 #include <linux/soc/qcom/mdt_loader.h>
+#include <linux/string.h>
 
 #include "iris_core.h"
 #include "iris_firmware.h"
 
 #define IRIS_PAS_ID				9
-
-#define MAX_FIRMWARE_NAME_SIZE	128
+#define IRIS_FIRMWARE_START_ADDR	0
 
 /* Detect Gen2 firmware by scanning the blob for:
  *   QC_IMAGE_VERSION_STRING=<version>
@@ -30,79 +27,160 @@
 
 static bool iris_detect_gen2_from_fwdata(const u8 *data, size_t size)
 {
-	const char *marker = "QC_IMAGE_VERSION_STRING=";
+	static const char *marker = "QC_IMAGE_VERSION_STRING=";
 	const size_t mlen = strlen(marker);
-	int major = 0, minor = 0;
-	char version_buf[64];
-	size_t max;
+	static const char *vfw = "vfw";
+	const size_t vfwlen = strlen(vfw);
+	static const char *vf = "video-firmware.";
+	const size_t vflen = strlen(vf);
 
-	max = (size > mlen) ? size - mlen : 0;
-	for (size_t i = 0; i < max; i++) {
-		if (!memcmp(data + i, marker, mlen)) {
-			const char *found = (const char *)(data + i + mlen);
+	for (size_t i = 0; i + mlen < size; i++) {
+		const char *found;
 
-			strscpy(version_buf, found, sizeof(version_buf));
-			if (!strncmp(version_buf, "vfw", 3))
-				return true;
-			if (sscanf(version_buf, "video-firmware.%d.%d", &major, &minor) == 2 &&
-			    major >= 2)
-				return true;
-			break;
-		}
+		if (memcmp(data + i, marker, mlen))
+			continue;
+
+		found = data + i + mlen;
+		size -= i + mlen;
+
+		/* vfw => Gen2 */
+		if (size > vfwlen && !memcmp(found, vfw, vfwlen))
+			return true;
+
+		if (size < vflen ||
+		    memcmp(found, vf, vflen))
+			return false;
+
+		found += vflen;
+		size -= vflen;
+
+		/*
+		 * video-firmware.1.x is Gen1.
+		 * video-firmware.2.x and video-firmware.10.x are Gen2.
+		 */
+		return size >= 2 &&
+			(*found >= '2' || (*found == '1' && found[1] != '.'));
 	}
 
 	return false;
 }
 
-static const struct firmware *iris_detect_firmware(struct iris_core *core,
-						   const char **fw_name)
+/*
+ * Load the firmware image and return the descriptor that was used to pick the
+ * file. On a platform that provides only one generation, or when no DT
+ * firmware-name override is present, the returned descriptor is final. With a
+ * DT override on a dual-generation platform the returned descriptor is only a
+ * default; iris_detect_firmware() inspects the loaded image to confirm it.
+ */
+static const struct firmware *iris_load_firmware(struct iris_core *core,
+						 const char **fw_name,
+						 const struct iris_firmware_desc **fw_desc)
 {
+	const struct iris_firmware_desc *desc;
 	const struct firmware *firmware;
 	bool has_both_gens;
 	int ret;
 
 	*fw_name = NULL;
-	if (core->iris_platform_data->firmware_desc_gen2)
-		core->iris_firmware_desc = core->iris_platform_data->firmware_desc_gen2;
-	else if (core->iris_platform_data->firmware_desc_gen1)
-		core->iris_firmware_desc = core->iris_platform_data->firmware_desc_gen1;
-	else
-		return ERR_PTR(-EINVAL);
+	ret = of_property_read_string_index(dev_of_node(core->dev), "firmware-name", 0, fw_name);
+
+	/*
+	 * A platform may support both Gen1 and Gen2 firmware; which one is used
+	 * depends on the firmware image installed on the system, not on the
+	 * hardware. That installed image does not change while the device is
+	 * bound, so the generation is detected only once and the chosen
+	 * descriptor is reused on later core bring-ups (e.g. after a system
+	 * error recovery).
+	 */
+	if (core->iris_firmware_desc) {
+		if (ret)
+			*fw_name = core->iris_firmware_desc->fwname;
+		ret = request_firmware(&firmware, *fw_name, core->dev);
+		if (ret)
+			return ERR_PTR(ret);
+		*fw_desc = core->iris_firmware_desc;
+		return firmware;
+	}
 
 	has_both_gens = core->iris_platform_data->firmware_desc_gen2 &&
 		core->iris_platform_data->firmware_desc_gen1;
 
-	ret = of_property_read_string_index(dev_of_node(core->dev), "firmware-name", 0, fw_name);
+	if (core->iris_platform_data->firmware_desc_gen2)
+		desc = core->iris_platform_data->firmware_desc_gen2;
+	else if (core->iris_platform_data->firmware_desc_gen1)
+		desc = core->iris_platform_data->firmware_desc_gen1;
+	else
+		return ERR_PTR(-EINVAL);
+
 	if (ret) {
-		*fw_name = core->iris_firmware_desc->fwname;
-		ret = request_firmware(&firmware, *fw_name, core->dev);
+		/* No firmware-name in DT: select by probing Gen2 then Gen1. */
+		*fw_name = desc->fwname;
+		if (has_both_gens)
+			ret = firmware_request_nowarn(&firmware, *fw_name, core->dev);
+		else
+			ret = request_firmware(&firmware, *fw_name, core->dev);
 		if (ret && has_both_gens) {
-			core->iris_firmware_desc = core->iris_platform_data->firmware_desc_gen1;
-			*fw_name = core->iris_firmware_desc->fwname;
+			desc = core->iris_platform_data->firmware_desc_gen1;
+			*fw_name = desc->fwname;
 			ret = request_firmware(&firmware, *fw_name, core->dev);
 		}
-
-		return ret ? ERR_PTR(ret) : firmware;
+	} else {
+		/* firmware-name given: iris_detect_firmware() picks the gen. */
+		ret = request_firmware(&firmware, *fw_name, core->dev);
 	}
-
-	ret = request_firmware(&firmware, *fw_name, core->dev);
 	if (ret)
 		return ERR_PTR(ret);
 
-	if (has_both_gens &&
-	    !iris_detect_gen2_from_fwdata((const u8 *)firmware->data, firmware->size)) {
-		dev_info(core->dev, "Gen1 FW detected in %s\n", *fw_name);
-		core->iris_firmware_desc = core->iris_platform_data->firmware_desc_gen1;
+	*fw_desc = desc;
+	return firmware;
+}
+
+/*
+ * Detect the firmware generation and publish the descriptor. Run only after
+ * qcom_mdt_load() has succeeded, so the driver commits to a HFI generation
+ * only for a firmware image that has actually been loaded.
+ *
+ * The generation is detected from the loaded image (@data / @size point at the
+ * reserved memory region populated by qcom_mdt_load()) rather than from the
+ * request_firmware() blob: for a split .mdt the latter holds only the ELF
+ * headers, while QC_IMAGE_VERSION_STRING lives in the .bNN data segments.
+ *
+ * The descriptor and firmware data are published exactly once, before any
+ * session exists, so the lockless readers in the ioctl paths never observe a
+ * reassignment. Later bring-ups reuse the already published descriptor.
+ */
+static void iris_detect_firmware(struct iris_core *core, const char *fw_name,
+				 const u8 *data, size_t size,
+				 const struct iris_firmware_desc *desc)
+{
+	if (core->iris_firmware_desc)
+		return;
+
+	/*
+	 * With a DT firmware-name override on a dual-generation platform the
+	 * image on disk decides the generation, so inspect it and switch to the
+	 * Gen1 descriptor when a Gen1 image was loaded.
+	 */
+	if (desc == core->iris_platform_data->firmware_desc_gen2 &&
+	    core->iris_platform_data->firmware_desc_gen1 &&
+	    of_property_present(dev_of_node(core->dev), "firmware-name") &&
+	    !iris_detect_gen2_from_fwdata(data, size)) {
+		dev_info(core->dev, "Gen1 FW detected in %s\n", fw_name);
+		desc = core->iris_platform_data->firmware_desc_gen1;
 	}
 
-	return firmware;
+	/* Publish iris_firmware_data first, then iris_firmware_desc (the guard). */
+	core->iris_firmware_data = desc->firmware_data;
+	core->iris_firmware_desc = desc;
 }
 
 static int iris_load_fw_to_memory(struct iris_core *core)
 {
-	struct qcom_scm_pas_context *ctx;
+	struct device *fw_dev = core->fw_dev ? core->fw_dev : core->dev;
+	const struct iris_firmware_desc *desc = NULL;
 	const struct firmware *firmware = NULL;
-	struct device *dev = core->dev;
+	struct qcom_pas_context	*ctx;
+	struct iommu_domain *domain;
 	struct resource res;
 	phys_addr_t mem_phys;
 	const char *fw_name;
@@ -110,26 +188,23 @@ static int iris_load_fw_to_memory(struct iris_core *core)
 	ssize_t fw_size;
 	int ret;
 
-	ret = of_reserved_mem_region_to_resource(dev->of_node, 0, &res);
+	ret = of_reserved_mem_region_to_resource(core->dev->of_node, 0, &res);
 	if (ret)
 		return ret;
 
 	mem_phys = res.start;
 	res_size = resource_size(&res);
 
-	dev = core->fw.dev ? : core->dev;
+	if (!core->pas_ctx) {
+		ctx = devm_qcom_pas_context_alloc(core->dev, IRIS_PAS_ID, mem_phys, res_size);
+		if (IS_ERR(ctx))
+			return PTR_ERR(ctx);
+		core->pas_ctx = ctx;
+	}
 
-	ctx = devm_qcom_scm_pas_context_alloc(dev, IRIS_PAS_ID, mem_phys, res_size);
-	if (!ctx)
-		return -ENOMEM;
-
-	ctx->use_tzmem = core->fw.dev;
-
-	firmware = iris_detect_firmware(core, &fw_name);
+	firmware = iris_load_firmware(core, &fw_name, &desc);
 	if (IS_ERR(firmware))
 		return PTR_ERR(firmware);
-
-	core->iris_firmware_data = core->iris_firmware_desc->firmware_data;
 
 	fw_size = qcom_mdt_get_size(firmware);
 	if (fw_size < 0 || res_size < (size_t)fw_size) {
@@ -137,37 +212,55 @@ static int iris_load_fw_to_memory(struct iris_core *core)
 		goto err_release_fw;
 	}
 
-	ret = qcom_mdt_pas_load(ctx, firmware, fw_name, NULL);
-	qcom_scm_pas_metadata_release(ctx);
+	core->pas_ctx->use_tzmem = !!core->fw_dev;
+	ret = qcom_mdt_pas_load(core->pas_ctx, firmware, fw_name, NULL);
 	if (ret)
 		goto err_release_fw;
 
-	if (core->fw.iommu_domain) {
-		ret = iommu_map(core->fw.iommu_domain, 0, mem_phys, res_size,
-				IOMMU_READ | IOMMU_WRITE | IOMMU_PRIV, GFP_KERNEL);
-		if (ret)
+	if (core->pas_ctx->use_tzmem) {
+		domain = iommu_get_domain_for_dev(fw_dev);
+		if (!domain) {
+			ret = -ENODEV;
 			goto err_release_fw;
+		}
+
+		ret = iommu_map(domain, IRIS_FIRMWARE_START_ADDR, mem_phys, res_size,
+				IOMMU_READ | IOMMU_WRITE | IOMMU_PRIV, GFP_KERNEL);
 	}
 
-	ret = qcom_scm_pas_prepare_and_auth_reset(ctx);
-	if (ret)
-		goto err_iommu_unmap;
+	if (!ret) {
+		void *mem_virt = memremap(mem_phys, res_size, MEMREMAP_WC);
 
-	core->fw.ctx = ctx;
+		if (!mem_virt) {
+			ret = -ENOMEM;
+			goto err_release_fw;
+		}
+		iris_detect_firmware(core, fw_name, mem_virt, res_size, desc);
+		memunmap(mem_virt);
+	}
 
-	return ret;
-
-err_iommu_unmap:
-	iommu_unmap(core->fw.iommu_domain, 0, res_size);
 err_release_fw:
 	release_firmware(firmware);
 
 	return ret;
 }
 
+static void iris_fw_iommu_unmap(struct iris_core *core)
+{
+	struct iommu_domain *domain;
+
+	if (!core->fw_dev)
+		return;
+
+	domain = iommu_get_domain_for_dev(core->fw_dev);
+	if (domain)
+		iommu_unmap(domain, IRIS_FIRMWARE_START_ADDR, core->pas_ctx->mem_size);
+}
+
 int iris_fw_load(struct iris_core *core)
 {
 	const struct tz_cp_config *cp_config;
+	const char *pas_backend;
 	int i, ret;
 
 	ret = iris_load_fw_to_memory(core);
@@ -175,6 +268,21 @@ int iris_fw_load(struct iris_core *core)
 		dev_err(core->dev, "firmware download failed %d\n", ret);
 		return ret;
 	}
+
+	ret = qcom_pas_prepare_and_auth_reset(core->pas_ctx);
+	if (ret)  {
+		dev_err(core->dev, "auth and reset failed: %d\n", ret);
+		goto err_unmap;
+	}
+
+	/*
+	 * qcom_scm_mem_protect_video_var() only applies to the SCM backend;
+	 * other backends (e.g. OP-TEE) own secure memory protection and do
+	 * not service this call.
+	 */
+	pas_backend = qcom_pas_get_backend();
+	if (!pas_backend || strcmp(pas_backend, QCOM_PAS_BACKEND_SCM))
+		return 0;
 
 	for (i = 0; i < core->iris_platform_data->tz_cp_config_data_size; i++) {
 		cp_config = &core->iris_platform_data->tz_cp_config_data[i];
@@ -184,101 +292,31 @@ int iris_fw_load(struct iris_core *core)
 						     cp_config->cp_nonpixel_size);
 		if (ret) {
 			dev_err(core->dev, "qcom_scm_mem_protect_video_var failed: %d\n", ret);
-			qcom_scm_pas_shutdown(IRIS_PAS_ID);
-			return ret;
+			goto err_pas_shutdown;
 		}
 	}
 
 	return 0;
+
+err_pas_shutdown:
+	qcom_pas_shutdown(IRIS_PAS_ID);
+err_unmap:
+	iris_fw_iommu_unmap(core);
+
+	return ret;
 }
 
 int iris_fw_unload(struct iris_core *core)
 {
-	struct qcom_scm_pas_context *ctx = core->fw.ctx;
 	int ret;
 
-	if (!ctx)
-		return -EINVAL;
+	ret = qcom_pas_shutdown(IRIS_PAS_ID);
+	iris_fw_iommu_unmap(core);
 
-	ret = qcom_scm_pas_shutdown(ctx->pas_id);
-	if (core->fw.iommu_domain)
-		iommu_unmap(core->fw.iommu_domain, 0, ctx->mem_size);
-
-	core->fw.ctx = NULL;
 	return ret;
 }
 
 int iris_set_hw_state(struct iris_core *core, bool resume)
 {
-	return qcom_scm_set_remote_state(resume, 0);
-}
-
-int iris_fw_init(struct iris_core *core)
-{
-	struct platform_device_info info;
-	struct iommu_domain *iommu_dom;
-	struct platform_device *pdev;
-	struct device_node *np;
-	int ret;
-
-	np = of_get_child_by_name(core->dev->of_node, "video-firmware");
-	if (!np)
-		return 0;
-
-	memset(&info, 0, sizeof(info));
-	info.fwnode = &np->fwnode;
-	info.parent = core->dev;
-	info.name = np->name;
-	info.dma_mask = DMA_BIT_MASK(32);
-
-	pdev = platform_device_register_full(&info);
-	if (IS_ERR(pdev)) {
-		of_node_put(np);
-		return PTR_ERR(pdev);
-	}
-
-	pdev->dev.of_node = np;
-
-	ret = of_dma_configure(&pdev->dev, np, true);
-	if (ret)
-		goto err_unregister;
-
-	core->fw.dev = &pdev->dev;
-
-	iommu_dom = iommu_get_domain_for_dev(core->fw.dev);
-	if (!iommu_dom) {
-		ret = -EINVAL;
-		goto err_unset_fw_dev;
-	}
-
-	ret = iommu_attach_device(iommu_dom, core->fw.dev);
-	if (ret)
-		goto err_unset_fw_dev;
-
-	core->fw.iommu_domain = iommu_dom;
-
-	of_node_put(np);
-
-	return 0;
-
-err_unset_fw_dev:
-	core->fw.dev = NULL;
-err_unregister:
-	platform_device_unregister(pdev);
-	of_node_put(np);
-	return ret;
-}
-
-void iris_fw_deinit(struct iris_core *core)
-{
-	if (!core->fw.dev)
-		return;
-
-	if (core->fw.iommu_domain) {
-		iommu_detach_device(core->fw.iommu_domain, core->fw.dev);
-		core->fw.iommu_domain = NULL;
-	}
-
-	platform_device_unregister(to_platform_device(core->fw.dev));
-	core->fw.dev = NULL;
+	return qcom_pas_set_remote_state(resume, IRIS_PAS_ID);
 }

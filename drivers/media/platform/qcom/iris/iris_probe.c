@@ -40,15 +40,45 @@ static int iris_init_icc(struct iris_core *core)
 	return devm_of_icc_bulk_get(core->dev, core->icc_count, core->icc_tbl);
 }
 
+static int iris_init_power_domains_per_block(struct iris_core *core,
+					     struct iris_power_domain *pd,
+					     const struct iris_power_domain_data *pd_data)
+{
+	struct dev_pm_domain_attach_data iris_pd_data = {};
+	struct dev_pm_domain_list *pmdomain_tbl;
+	int ret, i;
+
+	if (!pd_data->pd_cnt)
+		return -EINVAL;
+
+	iris_pd_data.pd_names = pd_data->pd_names;
+	iris_pd_data.num_pd_names = pd_data->pd_cnt;
+	iris_pd_data.pd_flags = PD_FLAG_NO_DEV_LINK;
+
+	ret = devm_pm_domain_attach_list(core->dev, &iris_pd_data, &pmdomain_tbl);
+	if (ret < 0)
+		return ret;
+
+	pd->pd_cnt = pmdomain_tbl->num_pds;
+
+	if (pd->pd_cnt != pd_data->pd_cnt)
+		return -EINVAL;
+
+	pd->dev = devm_kzalloc(core->dev, pd->pd_cnt * sizeof(*pd->dev), GFP_KERNEL);
+	if (!pd->dev)
+		return -ENOMEM;
+
+	for (i = 0; i < pd->pd_cnt; i++)
+		pd->dev[i] = pmdomain_tbl->pd_devs[i];
+
+	return 0;
+}
+
 static int iris_init_power_domains(struct iris_core *core)
 {
-	int ret;
-
-	struct dev_pm_domain_attach_data iris_pd_data = {
-		.pd_names = core->iris_platform_data->pmdomain_tbl->pd_names,
-		.num_pd_names = core->iris_platform_data->pmdomain_tbl->pd_count,
-		.pd_flags = PD_FLAG_NO_DEV_LINK,
-	};
+	const struct iris_platform_data *plat = core->iris_platform_data;
+	unsigned int num_cores = max(plat->num_cores, 1);
+	int i, ret;
 
 	struct dev_pm_domain_attach_data iris_opp_pd_data = {
 		.pd_names = core->iris_platform_data->opp_pd_tbl,
@@ -61,9 +91,76 @@ static int iris_init_power_domains(struct iris_core *core)
 		.config_clks = dev_pm_opp_config_clks_simple,
 	};
 
-	ret = devm_pm_domain_attach_list(core->dev, &iris_pd_data, &core->pmdomain_tbl);
-	if (ret < 0)
+	core->ctrl = devm_kzalloc(core->dev, sizeof(*core->ctrl), GFP_KERNEL);
+	if (!core->ctrl)
+		return -ENOMEM;
+
+	ret = iris_init_power_domains_per_block(core, core->ctrl, plat->ctrl_data);
+	if (ret)
 		return ret;
+
+	core->vcodec = devm_kzalloc(core->dev, num_cores * sizeof(*core->vcodec), GFP_KERNEL);
+	if (!core->vcodec)
+		return -ENOMEM;
+
+	for (i = 0; i < num_cores; i++) {
+		ret = iris_init_power_domains_per_block(core, &core->vcodec[i],
+							&plat->vcodec_data[i]);
+		if (ret)
+			return ret;
+	}
+
+	if (plat->vcodec_vpp0_data) {
+		core->vcodec_vpp0 = devm_kzalloc(core->dev, sizeof(*core->vcodec_vpp0), GFP_KERNEL);
+		if (!core->vcodec_vpp0)
+			return -ENOMEM;
+
+		ret = iris_init_power_domains_per_block(core, core->vcodec_vpp0,
+							plat->vcodec_vpp0_data);
+		if (ret)
+			return ret;
+	}
+
+	if (plat->vcodec_vpp1_data) {
+		core->vcodec_vpp1 = devm_kzalloc(core->dev, sizeof(*core->vcodec_vpp1), GFP_KERNEL);
+		if (!core->vcodec_vpp1)
+			return -ENOMEM;
+
+		ret = iris_init_power_domains_per_block(core, core->vcodec_vpp1,
+							plat->vcodec_vpp1_data);
+		if (ret)
+			return ret;
+	}
+
+	if (plat->apv_data) {
+		core->apv = devm_kzalloc(core->dev, sizeof(*core->apv), GFP_KERNEL);
+		if (!core->apv)
+			return -ENOMEM;
+
+		ret = iris_init_power_domains_per_block(core, core->apv, plat->apv_data);
+		if (ret)
+			return ret;
+	}
+
+	if (plat->mm_int_data) {
+		core->mm_int = devm_kzalloc(core->dev, sizeof(*core->mm_int), GFP_KERNEL);
+		if (!core->mm_int)
+			return -ENOMEM;
+
+		ret = iris_init_power_domains_per_block(core, core->mm_int, plat->mm_int_data);
+		if (ret)
+			return ret;
+	}
+
+	if (plat->cx_int_data) {
+		core->cx_int = devm_kzalloc(core->dev, sizeof(*core->cx_int), GFP_KERNEL);
+		if (!core->cx_int)
+			return -ENOMEM;
+
+		ret = iris_init_power_domains_per_block(core, core->cx_int, plat->cx_int_data);
+		if (ret)
+			return ret;
+	}
 
 	ret =  devm_pm_domain_attach_list(core->dev, &iris_opp_pd_data, &core->opp_pmdomain_tbl);
 	/* backwards compatibility for incomplete ABI SM8250 */
@@ -83,17 +180,59 @@ static int iris_init_power_domains(struct iris_core *core)
 	return devm_pm_opp_of_add_table(core->dev);
 }
 
+static int iris_init_clocks_per_block(struct iris_core *core, struct iris_power_domain *pd,
+				      const struct iris_power_domain_data *pd_data)
+{
+	unsigned int i;
+
+	if (!pd_data)
+		return 0;
+
+	pd->clk_cnt = pd_data->clk_cnt;
+	pd->clocks = devm_kcalloc(core->dev, pd->clk_cnt, sizeof(*pd->clocks), GFP_KERNEL);
+	if (!pd->clocks)
+		return -ENOMEM;
+
+	for (i = 0; i < pd->clk_cnt; i++)
+		pd->clocks[i].id = pd_data->clk_names[i];
+
+	return devm_clk_bulk_get(core->dev, pd->clk_cnt, pd->clocks);
+}
+
 static int iris_init_clocks(struct iris_core *core)
 {
+	const struct iris_platform_data *plat = core->iris_platform_data;
+	unsigned int num_cores = max(plat->num_cores, 1);
+	unsigned int i;
 	int ret;
 
-	ret = devm_clk_bulk_get_all(core->dev, &core->clock_tbl);
-	if (ret < 0)
+	ret = iris_init_clocks_per_block(core, core->ctrl, plat->ctrl_data);
+	if (ret)
 		return ret;
 
-	core->clk_count = ret;
+	for (i = 0; i < num_cores; i++) {
+		ret = iris_init_clocks_per_block(core, &core->vcodec[i], &plat->vcodec_data[i]);
+		if (ret)
+			return ret;
+	}
 
-	return 0;
+	ret = iris_init_clocks_per_block(core, core->vcodec_vpp0, plat->vcodec_vpp0_data);
+	if (ret)
+		return ret;
+
+	ret = iris_init_clocks_per_block(core, core->vcodec_vpp1, plat->vcodec_vpp1_data);
+	if (ret)
+		return ret;
+
+	ret = iris_init_clocks_per_block(core, core->apv, plat->apv_data);
+	if (ret)
+		return ret;
+
+	ret = iris_init_clocks_per_block(core, core->mm_int, plat->mm_int_data);
+	if (ret)
+		return ret;
+
+	return iris_init_clocks_per_block(core, core->cx_int, plat->cx_int_data);
 }
 
 static int iris_init_reset_table(struct iris_core *core,
@@ -132,20 +271,6 @@ static int iris_init_resets(struct iris_core *core)
 				     core->iris_platform_data->controller_rst_tbl_size);
 }
 
-static int iris_init_cb_devs(struct iris_core *core)
-{
-	if (core->iris_platform_data->init_cb_devs)
-		return core->iris_platform_data->init_cb_devs(core);
-
-	return 0;
-}
-
-static void iris_deinit_cb_devs(struct iris_core *core)
-{
-	if (core->iris_platform_data->deinit_cb_devs)
-		core->iris_platform_data->deinit_cb_devs(core);
-}
-
 static int iris_init_resources(struct iris_core *core)
 {
 	int ret;
@@ -163,6 +288,133 @@ static int iris_init_resources(struct iris_core *core)
 		return ret;
 
 	return iris_init_resets(core);
+}
+
+static void iris_unreserve_iova_region(struct device *dev, struct dma_iova_state *iova_state)
+{
+	unsigned int i;
+
+	if (!iova_state)
+		return;
+
+	for (i = 0; dma_iova_size(&iova_state[i]); i++)
+		dma_iova_free(dev, &iova_state[i]);
+}
+
+static int iris_reserve_iova_region(struct device *dev, struct dma_iova_state **iova_state,
+				    unsigned long start, unsigned long size)
+{
+	unsigned long dma_limit = dev->bus_dma_limit;
+	unsigned long end, rem, chunk;
+	struct dma_iova_state *state;
+	unsigned int count = 0;
+	int ret = -ENOMEM;
+
+	state = devm_kcalloc(dev, BITS_PER_TYPE(dma_addr_t) + 1, sizeof(*state), GFP_KERNEL);
+	if (!state)
+		return ret;
+
+	end = start + size;
+	rem = end - max(start, PAGE_SIZE);
+	dev->bus_dma_limit = end - 1;
+
+	while (rem) {
+		chunk = min(end & -end, (u64)1 << (fls64(rem) - 1));
+
+		if (!dma_iova_try_alloc(dev, &state[count], 0, chunk))
+			goto err_free_iova;
+
+		if (state[count].addr != end - chunk || state[count].__size != chunk)
+			goto err_free_iova;
+
+		rem -= chunk;
+		end -= chunk;
+		count++;
+	}
+
+	*iova_state = state;
+	dev->bus_dma_limit = dma_limit;
+
+	return 0;
+
+err_free_iova:
+	iris_unreserve_iova_region(dev, state);
+	dev->bus_dma_limit = dma_limit;
+
+	return ret;
+}
+
+static struct device *iris_create_cb_dev(struct iris_core *core, const char *name)
+{
+	struct platform_device_info plat_dev_info = {};
+	struct device_node *child_of_node;
+	struct platform_device *pdev;
+
+	child_of_node = of_get_child_by_name(core->dev->of_node, name);
+	if (!child_of_node)
+		return NULL;
+
+	plat_dev_info.dma_mask = core->iris_platform_data->dma_mask;
+	plat_dev_info.fwnode = &child_of_node->fwnode;
+	plat_dev_info.name = child_of_node->name;
+	plat_dev_info.id = PLATFORM_DEVID_AUTO;
+	plat_dev_info.parent = core->dev;
+
+	pdev = platform_device_register_full(&plat_dev_info);
+	of_node_put(child_of_node);
+	if (IS_ERR(pdev))
+		return ERR_CAST(pdev);
+
+	dma_set_max_seg_size(&pdev->dev, DMA_BIT_MASK(32));
+	dma_set_seg_boundary(&pdev->dev, DMA_BIT_MASK(32));
+
+	return &pdev->dev;
+}
+
+static int iris_init_cb_devs(struct iris_core *core)
+{
+	struct device *dev;
+
+	dev = iris_create_cb_dev(core, "non-pixel");
+	if (IS_ERR(dev))
+		return PTR_ERR(dev);
+
+	core->np_dev = dev;
+
+	dev = iris_create_cb_dev(core, "pixel");
+	if (IS_ERR(dev))
+		goto unreg_np_dev;
+
+	core->p_dev = dev;
+
+	dev = iris_create_cb_dev(core, "video-firmware");
+	if (IS_ERR(dev))
+		goto unreg_p_dev;
+
+	core->fw_dev = dev;
+
+	return 0;
+
+unreg_p_dev:
+	if (core->p_dev)
+		platform_device_unregister(to_platform_device(core->p_dev));
+	core->p_dev = NULL;
+unreg_np_dev:
+	if (core->np_dev)
+		platform_device_unregister(to_platform_device(core->np_dev));
+	core->np_dev = NULL;
+
+	return PTR_ERR(dev);
+}
+
+static void iris_deinit_cb_devs(struct iris_core *core)
+{
+	if (core->fw_dev)
+		platform_device_unregister(to_platform_device(core->fw_dev));
+	if (core->p_dev)
+		platform_device_unregister(to_platform_device(core->p_dev));
+	if (core->np_dev)
+		platform_device_unregister(to_platform_device(core->np_dev));
 }
 
 static int iris_register_video_device(struct iris_core *core, enum domain_type type)
@@ -215,14 +467,18 @@ static void iris_remove(struct platform_device *pdev)
 	if (!core)
 		return;
 
+	cancel_delayed_work_sync(&core->sys_error_handler);
+
 	iris_core_deinit(core);
-	iris_deinit_cb_devs(core);
 
 	video_unregister_device(core->vdev_dec);
 	video_unregister_device(core->vdev_enc);
 
 	v4l2_device_unregister(&core->v4l2_dev);
 
+	iris_deinit_cb_devs(core);
+
+	iris_unreserve_iova_region(core->dev, core->iova_state);
 	iris_debugfs_deinit(core);
 
 	mutex_destroy(&core->lock);
@@ -289,13 +545,26 @@ static int iris_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+	/*
+	 * With context bank subnodes the "iommus" sit on the subnodes and the
+	 * non-pixel IOVA restriction comes from "iommu-ranges", so reserve the
+	 * range here only when the core device itself is behind an IOMMU.
+	 */
+	if (device_iommu_mapped(dev)) {
+		ret = iris_reserve_iova_region(dev, &core->iova_state,
+					       IRIS_NP_RESERVE_IOVA_START,
+					       IRIS_NP_RESERVE_IOVA_SIZE);
+		if (ret)
+			return ret;
+	}
+
 	ret = iris_init_cb_devs(core);
 	if (ret)
-		return ret;
+		goto err_unresv_iova_region;
 
 	ret = v4l2_device_register(dev, &core->v4l2_dev);
 	if (ret)
-		goto err_deinit_cb;
+		goto err_cb_deinit;
 
 	ret = iris_register_video_device(core, DECODER);
 	if (ret)
@@ -309,8 +578,8 @@ static int iris_probe(struct platform_device *pdev)
 
 	dma_mask = core->iris_platform_data->dma_mask;
 
-	if (device_iommu_mapped(core->dev)) {
-		ret = dma_set_mask_and_coherent(core->dev, dma_mask);
+	if (device_iommu_mapped(dev)) {
+		ret = dma_set_mask_and_coherent(dev, dma_mask);
 		if (ret)
 			goto err_vdev_unreg_enc;
 	}
@@ -334,8 +603,10 @@ err_vdev_unreg_dec:
 	video_unregister_device(core->vdev_dec);
 err_v4l2_unreg:
 	v4l2_device_unregister(&core->v4l2_dev);
-err_deinit_cb:
+err_cb_deinit:
 	iris_deinit_cb_devs(core);
+err_unresv_iova_region:
+	iris_unreserve_iova_region(dev, core->iova_state);
 
 	return ret;
 }
@@ -387,12 +658,32 @@ static const struct dev_pm_ops iris_pm_ops = {
 
 static const struct of_device_id iris_dt_match[] = {
 	{
+		.compatible = "qcom,eliza-iris",
+		.data = &eliza_data,
+	},
+	{
 		.compatible = "qcom,glymur-iris",
 		.data = &glymur_data,
 	},
 	{
+		.compatible = "qcom,hawi-iris",
+		.data = &hawi_data,
+	},
+	{
 		.compatible = "qcom,kaanapali-iris",
 		.data = &kaanapali_data,
+	},
+	{
+		.compatible = "qcom,maili-iris",
+		.data = &maili_data,
+	},
+	{
+		.compatible = "qcom,milos-iris",
+		.data = &milos_data,
+	},
+	{
+		.compatible = "qcom,qcm2290-venus",
+		.data = &qcm2290_data,
 	},
 	{
 		.compatible = "qcom,qcs8300-iris",

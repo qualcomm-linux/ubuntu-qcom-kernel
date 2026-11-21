@@ -7,6 +7,7 @@
 #define __IRIS_CORE_H__
 
 #include <linux/types.h>
+#include <linux/dma-mapping.h>
 #include <linux/pm_domain.h>
 #include <media/v4l2-device.h>
 
@@ -15,6 +16,13 @@
 #include "iris_platform_common.h"
 #include "iris_resources.h"
 #include "iris_state.h"
+
+struct iris_power_domain {
+	struct device		**dev;
+	unsigned int		pd_cnt;
+	struct clk_bulk_data	*clocks;
+	unsigned int		clk_cnt;
+};
 
 struct icc_info {
 	const char		*name;
@@ -25,27 +33,30 @@ struct icc_info {
 #define IRIS_FW_VERSION_LENGTH		128
 #define IFACEQ_CORE_PKT_SIZE		(1024 * 4)
 
+#define IRIS_NP_RESERVE_IOVA_START	0x0
+#define IRIS_NP_RESERVE_IOVA_SIZE	0x25800000
+
 enum domain_type {
 	ENCODER	= BIT(0),
 	DECODER	= BIT(1),
 };
-
-struct qcom_ubwc_cfg_data;
 
 enum iris_vcodec_core_id {
 	IRIS_VCODEC0 = 1,
 	IRIS_VCODEC1,
 };
 
+struct qcom_ubwc_cfg_data;
 struct dentry;
 
 /**
  * struct iris_core - holds core parameters valid for all instances
  *
  * @dev: reference to device structure
- * @dev_np: reference to non-pixel context bank device structure
- * @dev_p: reference to pixel context bank device structure
- * @dev_bs: reference to bitstream context bank device structure
+ * @np_dev: reference to non-pixel device structure
+ * @p_dev: reference to pixel device structure
+ * @fw_dev: reference to firmware device structure
+ * @pas_ctx: PAS context for authenticated firmware load and shutdown
  * @reg_base: IO memory base address
  * @irq: iris irq
  * @v4l2_dev: a holder for v4l2 device structure
@@ -57,10 +68,14 @@ struct dentry;
  * @iris_vb2_ops: iris vb2 ops
  * @icc_tbl: table of iris interconnects
  * @icc_count: count of iris interconnects
- * @pmdomain_tbl: table of iris power domains
+ * @ctrl: power domain and clocks for the controller
+ * @vcodec: power domain and clocks for the vcodec
+ * @vcodec_vpp0: power domain and clocks for the vcodec VPP0
+ * @vcodec_vpp1: power domain and clocks for the vcodec VPP1
+ * @apv: power domain and clocks for the APV hardware block
+ * @mm_int: power domain and clocks for the MM interconnect block
+ * @cx_int: power domain and clocks for the CX interconnect block
  * @opp_pmdomain_tbl: table of opp power domains
- * @clock_tbl: table of iris clocks
- * @clk_count: count of iris clocks
  * @resets: table of iris reset clocks
  * @controller_resets: table of controller reset clocks
  * @iris_platform_data: a structure for platform data
@@ -90,33 +105,34 @@ struct dentry;
  * @instances: a list_head of all instances
  * @inst_fw_caps_dec: an array of supported instance capabilities by decoder
  * @inst_fw_caps_enc: an array of supported instance capabilities by encoder
+ * @iova_state: a pointer to an array of dma_iova_state entries reserved for restricted IOVA region
  */
 
 struct iris_core {
 	struct device				*dev;
-	struct device				*dev_np;
-	struct device				*dev_p;
-	struct device				*dev_bs;
+	struct device				*np_dev;
+	struct device				*p_dev;
+	struct device				*fw_dev;
+	struct qcom_pas_context			*pas_ctx;
 	void __iomem				*reg_base;
 	int					irq;
 	struct v4l2_device			v4l2_dev;
 	struct video_device			*vdev_dec;
 	struct video_device			*vdev_enc;
-	struct video_firmware {
-		struct device *dev;
-		struct qcom_scm_pas_context *ctx;
-		struct iommu_domain *iommu_domain;
-	} fw;
 	const struct v4l2_file_operations	*iris_v4l2_file_ops;
 	const struct v4l2_ioctl_ops		*iris_v4l2_ioctl_ops_dec;
 	const struct v4l2_ioctl_ops		*iris_v4l2_ioctl_ops_enc;
 	const struct vb2_ops			*iris_vb2_ops;
 	struct icc_bulk_data			*icc_tbl;
 	u32					icc_count;
-	struct dev_pm_domain_list		*pmdomain_tbl;
+	struct iris_power_domain		*ctrl;
+	struct iris_power_domain		*vcodec;
+	struct iris_power_domain		*vcodec_vpp0;
+	struct iris_power_domain		*vcodec_vpp1;
+	struct iris_power_domain		*apv;
+	struct iris_power_domain		*mm_int;
+	struct iris_power_domain		*cx_int;
 	struct dev_pm_domain_list		*opp_pmdomain_tbl;
-	struct clk_bulk_data			*clock_tbl;
-	u32					clk_count;
 	struct reset_control_bulk_data		*resets;
 	struct reset_control_bulk_data		*controller_resets;
 	const struct iris_platform_data		*iris_platform_data;
@@ -147,6 +163,7 @@ struct iris_core {
 	/* encoder and decoder have overlapping caps, so two different arrays are required */
 	struct platform_inst_fw_cap		inst_fw_caps_dec[INST_FW_CAP_MAX];
 	struct platform_inst_fw_cap		inst_fw_caps_enc[INST_FW_CAP_MAX];
+	struct dma_iova_state			*iova_state;
 };
 
 int iris_core_init(struct iris_core *core);
