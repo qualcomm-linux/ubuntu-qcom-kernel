@@ -10,9 +10,7 @@
 #include <linux/pm_opp.h>
 #include <linux/pm_runtime.h>
 #include <linux/reset.h>
-#include <linux/soc/qcom/ubwc.h>
 
-#include "iris_debugfs.h"
 #include "iris_core.h"
 #include "iris_ctrls.h"
 #include "iris_vidc.h"
@@ -45,8 +43,8 @@ static int iris_init_power_domains(struct iris_core *core)
 	int ret;
 
 	struct dev_pm_domain_attach_data iris_pd_data = {
-		.pd_names = core->iris_platform_data->pmdomain_tbl->pd_names,
-		.num_pd_names = core->iris_platform_data->pmdomain_tbl->pd_count,
+		.pd_names = core->iris_platform_data->pmdomain_tbl,
+		.num_pd_names = core->iris_platform_data->pmdomain_tbl_size,
 		.pd_flags = PD_FLAG_NO_DEV_LINK,
 	};
 
@@ -66,13 +64,6 @@ static int iris_init_power_domains(struct iris_core *core)
 		return ret;
 
 	ret =  devm_pm_domain_attach_list(core->dev, &iris_opp_pd_data, &core->opp_pmdomain_tbl);
-	/* backwards compatibility for incomplete ABI SM8250 */
-	if (ret == -ENODEV &&
-	    of_device_is_compatible(core->dev->of_node, "qcom,sm8250-venus")) {
-		iris_opp_pd_data.num_pd_names--;
-		ret = devm_pm_domain_attach_list(core->dev, &iris_opp_pd_data,
-						 &core->opp_pmdomain_tbl);
-	}
 	if (ret < 0)
 		return ret;
 
@@ -130,20 +121,6 @@ static int iris_init_resets(struct iris_core *core)
 	return iris_init_reset_table(core, &core->controller_resets,
 				     core->iris_platform_data->controller_rst_tbl,
 				     core->iris_platform_data->controller_rst_tbl_size);
-}
-
-static int iris_init_cb_devs(struct iris_core *core)
-{
-	if (core->iris_platform_data->init_cb_devs)
-		return core->iris_platform_data->init_cb_devs(core);
-
-	return 0;
-}
-
-static void iris_deinit_cb_devs(struct iris_core *core)
-{
-	if (core->iris_platform_data->deinit_cb_devs)
-		core->iris_platform_data->deinit_cb_devs(core);
 }
 
 static int iris_init_resources(struct iris_core *core)
@@ -216,14 +193,11 @@ static void iris_remove(struct platform_device *pdev)
 		return;
 
 	iris_core_deinit(core);
-	iris_deinit_cb_devs(core);
 
 	video_unregister_device(core->vdev_dec);
 	video_unregister_device(core->vdev_enc);
 
 	v4l2_device_unregister(&core->v4l2_dev);
-
-	iris_debugfs_deinit(core);
 
 	mutex_destroy(&core->lock);
 }
@@ -248,8 +222,6 @@ static int iris_probe(struct platform_device *pdev)
 	if (!core)
 		return -ENOMEM;
 	core->dev = dev;
-	core->fw_debug = IRIS_FW_DEBUG_DEFAULT;
-	core->hw_response_timeout = HW_RESPONSE_TIMEOUT_VALUE;
 
 	core->state = IRIS_CORE_DEINIT;
 	mutex_init(&core->lock);
@@ -272,30 +244,26 @@ static int iris_probe(struct platform_device *pdev)
 
 	core->iris_platform_data = of_device_get_match_data(core->dev);
 
-	core->ubwc_cfg = qcom_ubwc_config_get_data();
-	if (IS_ERR(core->ubwc_cfg))
-		return PTR_ERR(core->ubwc_cfg);
-
 	ret = devm_request_threaded_irq(core->dev, core->irq, iris_hfi_isr,
-					iris_hfi_isr_handler,
-					IRQF_TRIGGER_HIGH | IRQF_NO_AUTOEN,
-					"iris", core);
+					iris_hfi_isr_handler, IRQF_TRIGGER_HIGH, "iris", core);
 	if (ret)
 		return ret;
 
+	disable_irq_nosync(core->irq);
+
 	iris_init_ops(core);
+	core->iris_platform_data->init_hfi_command_ops(core);
+	core->iris_platform_data->init_hfi_response_ops(core);
 
 	ret = iris_init_resources(core);
 	if (ret)
 		return ret;
 
-	ret = iris_init_cb_devs(core);
-	if (ret)
-		return ret;
+	iris_session_init_caps(core);
 
 	ret = v4l2_device_register(dev, &core->v4l2_dev);
 	if (ret)
-		goto err_deinit_cb;
+		return ret;
 
 	ret = iris_register_video_device(core, DECODER);
 	if (ret)
@@ -309,11 +277,9 @@ static int iris_probe(struct platform_device *pdev)
 
 	dma_mask = core->iris_platform_data->dma_mask;
 
-	if (device_iommu_mapped(core->dev)) {
-		ret = dma_set_mask_and_coherent(core->dev, dma_mask);
-		if (ret)
-			goto err_vdev_unreg_enc;
-	}
+	ret = dma_set_mask_and_coherent(dev, dma_mask);
+	if (ret)
+		goto err_vdev_unreg_enc;
 
 	dma_set_max_seg_size(&pdev->dev, DMA_BIT_MASK(32));
 	dma_set_seg_boundary(&pdev->dev, DMA_BIT_MASK(32));
@@ -324,8 +290,6 @@ static int iris_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_vdev_unreg_enc;
 
-	iris_debugfs_init(core);
-
 	return 0;
 
 err_vdev_unreg_enc:
@@ -334,8 +298,6 @@ err_vdev_unreg_dec:
 	video_unregister_device(core->vdev_dec);
 err_v4l2_unreg:
 	v4l2_device_unregister(&core->v4l2_dev);
-err_deinit_cb:
-	iris_deinit_cb_devs(core);
 
 	return ret;
 }
@@ -387,14 +349,6 @@ static const struct dev_pm_ops iris_pm_ops = {
 
 static const struct of_device_id iris_dt_match[] = {
 	{
-		.compatible = "qcom,glymur-iris",
-		.data = &glymur_data,
-	},
-	{
-		.compatible = "qcom,kaanapali-iris",
-		.data = &kaanapali_data,
-	},
-	{
 		.compatible = "qcom,qcs8300-iris",
 		.data = &qcs8300_data,
 	},
@@ -417,10 +371,6 @@ static const struct of_device_id iris_dt_match[] = {
 	{
 		.compatible = "qcom,sm8750-iris",
 		.data = &sm8750_data,
-	},
-	{
-		.compatible = "qcom,x1p42100-iris",
-		.data = &x1p42100_data,
 	},
 	{ },
 };

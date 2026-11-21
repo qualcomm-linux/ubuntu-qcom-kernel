@@ -30,22 +30,10 @@ enum domain_type {
 	DECODER	= BIT(1),
 };
 
-struct qcom_ubwc_cfg_data;
-
-enum iris_vcodec_core_id {
-	IRIS_VCODEC0 = 1,
-	IRIS_VCODEC1,
-};
-
-struct dentry;
-
 /**
  * struct iris_core - holds core parameters valid for all instances
  *
  * @dev: reference to device structure
- * @dev_np: reference to non-pixel context bank device structure
- * @dev_p: reference to pixel context bank device structure
- * @dev_bs: reference to bitstream context bank device structure
  * @reg_base: IO memory base address
  * @irq: iris irq
  * @v4l2_dev: a holder for v4l2 device structure
@@ -64,9 +52,6 @@ struct dentry;
  * @resets: table of iris reset clocks
  * @controller_resets: table of controller reset clocks
  * @iris_platform_data: a structure for platform data
- * @iris_firmware_data: a pointer to the firmware (or HFI) specific data
- * @iris_firmware_desc: a pointer to the firmware-specific descriptive data
- * @ubwc_cfg: UBWC configuration for the platform
  * @state: current state of core
  * @iface_q_table_daddr: device address for interface queue table memory
  * @sfr_daddr: device address for SFR (Sub System Failure Reason) register memory
@@ -75,15 +60,13 @@ struct dentry;
  * @command_queue: shared interface queue to send commands to firmware
  * @message_queue: shared interface queue to receive responses from firmware
  * @debug_queue: shared interface queue to receive debug info from firmware
- * @root: debugfs root directory
- * @fw_debug: firmware debug log mask
- * @hw_response_timeout: hardware response timeout
- * @lock: a lock for this structure
+ * @lock: a lock for this strucure
  * @response_packet: a pointer to response packet from fw to driver
  * @header_id: id of packet header
  * @packet_id: id of packet
  * @power: a structure for clock and bw information
- * @hfi_sys_ops: iris HFI system ops
+ * @hfi_ops: iris hfi command ops
+ * @hfi_response_ops: iris hfi response ops
  * @core_init_done: structure of signal completion for system response
  * @intr_status: interrupt status
  * @sys_error_handler: a delayed work for handling system fatal error
@@ -94,19 +77,11 @@ struct dentry;
 
 struct iris_core {
 	struct device				*dev;
-	struct device				*dev_np;
-	struct device				*dev_p;
-	struct device				*dev_bs;
 	void __iomem				*reg_base;
 	int					irq;
 	struct v4l2_device			v4l2_dev;
 	struct video_device			*vdev_dec;
 	struct video_device			*vdev_enc;
-	struct video_firmware {
-		struct device *dev;
-		struct qcom_scm_pas_context *ctx;
-		struct iommu_domain *iommu_domain;
-	} fw;
 	const struct v4l2_file_operations	*iris_v4l2_file_ops;
 	const struct v4l2_ioctl_ops		*iris_v4l2_ioctl_ops_dec;
 	const struct v4l2_ioctl_ops		*iris_v4l2_ioctl_ops_enc;
@@ -120,9 +95,6 @@ struct iris_core {
 	struct reset_control_bulk_data		*resets;
 	struct reset_control_bulk_data		*controller_resets;
 	const struct iris_platform_data		*iris_platform_data;
-	const struct iris_firmware_data		*iris_firmware_data;
-	const struct iris_firmware_desc		*iris_firmware_desc;
-	const struct qcom_ubwc_cfg_data		*ubwc_cfg;
 	enum iris_core_state			state;
 	dma_addr_t				iface_q_table_daddr;
 	dma_addr_t				sfr_daddr;
@@ -131,15 +103,13 @@ struct iris_core {
 	struct iris_iface_q_info		command_queue;
 	struct iris_iface_q_info		message_queue;
 	struct iris_iface_q_info		debug_queue;
-	struct dentry				*root;
-	u32					fw_debug;
-	u32					hw_response_timeout;
 	struct mutex				lock; /* lock for core related operations */
 	u8					*response_packet;
 	u32					header_id;
 	u32					packet_id;
 	struct iris_core_power			power;
-	const struct iris_hfi_sys_ops		*hfi_sys_ops;
+	const struct iris_hfi_command_ops	*hfi_ops;
+	const struct iris_hfi_response_ops	*hfi_response_ops;
 	struct completion			core_init_done;
 	u32					intr_status;
 	struct delayed_work			sys_error_handler;

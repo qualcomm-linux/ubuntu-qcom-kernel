@@ -76,7 +76,7 @@ u32 iris_hfi_get_v4l2_matrix_coefficients(u32 hfi_coefficients)
 
 int iris_hfi_core_init(struct iris_core *core)
 {
-	const struct iris_hfi_sys_ops *hfi_ops = core->hfi_sys_ops;
+	const struct iris_hfi_command_ops *hfi_ops = core->hfi_ops;
 	int ret;
 
 	ret = hfi_ops->sys_init(core);
@@ -87,42 +87,7 @@ int iris_hfi_core_init(struct iris_core *core)
 	if (ret)
 		return ret;
 
-	if (hfi_ops->sys_set_debug) {
-		ret = hfi_ops->sys_set_debug(core);
-		if (ret)
-			dev_warn(core->dev,
-				 "failed to configure firmware debug logging: %d\n",
-				 ret);
-	}
-
 	return hfi_ops->sys_interframe_powercollapse(core);
-}
-
-int iris_hfi_set_debug(struct iris_core *core)
-{
-	const struct iris_hfi_sys_ops *hfi_ops = core->hfi_sys_ops;
-	int ret = 0;
-
-	if (!hfi_ops->sys_set_debug)
-		return 0;
-
-	ret = pm_runtime_resume_and_get(core->dev);
-	if (ret < 0)
-		return ret;
-
-	mutex_lock(&core->lock);
-	if (core->state != IRIS_CORE_INIT) {
-		ret = 0;
-		goto unlock;
-	}
-
-	ret = hfi_ops->sys_set_debug(core);
-
-unlock:
-	mutex_unlock(&core->lock);
-	pm_runtime_put_autosuspend(core->dev);
-
-	return ret;
 }
 
 irqreturn_t iris_hfi_isr(int irq, void *data)
@@ -144,7 +109,7 @@ irqreturn_t iris_hfi_isr_handler(int irq, void *data)
 	iris_vpu_clear_interrupt(core);
 	mutex_unlock(&core->lock);
 
-	core->hfi_sys_ops->sys_hfi_response_handler(core);
+	core->hfi_response_ops->hfi_response_handler(core);
 
 	if (!iris_vpu_watchdog(core, core->intr_status))
 		enable_irq(irq);
@@ -179,7 +144,7 @@ error:
 
 int iris_hfi_pm_resume(struct iris_core *core)
 {
-	const struct iris_hfi_sys_ops *ops = core->hfi_sys_ops;
+	const struct iris_hfi_command_ops *ops = core->hfi_ops;
 	int ret;
 
 	ret = iris_vpu_power_on(core);
@@ -197,14 +162,6 @@ int iris_hfi_pm_resume(struct iris_core *core)
 	ret = iris_vpu_switch_to_hwmode(core);
 	if (ret)
 		goto err_suspend_hw;
-
-	if (ops->sys_set_debug) {
-		ret = ops->sys_set_debug(core);
-		if (ret)
-			dev_warn(core->dev,
-				 "failed to configure firmware debug logging: %d\n",
-				 ret);
-	}
 
 	ret = ops->sys_interframe_powercollapse(core);
 	if (ret)

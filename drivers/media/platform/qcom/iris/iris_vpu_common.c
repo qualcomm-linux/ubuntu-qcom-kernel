@@ -63,7 +63,7 @@ static void iris_vpu_setup_ucregion_memory_map(struct iris_core *core)
 	writel(QTBL_ENABLE, core->reg_base + QTBL_INFO);
 
 	if (core->sfr_daddr) {
-		value = (u32)core->sfr_daddr + core->iris_firmware_data->core_arch;
+		value = (u32)core->sfr_daddr + core->iris_platform_data->core_arch;
 		writel(value, core->reg_base + SFR_ADDR);
 	}
 
@@ -78,6 +78,7 @@ int iris_vpu_boot_firmware(struct iris_core *core)
 	iris_vpu_setup_ucregion_memory_map(core);
 
 	writel(ctrl_init, core->reg_base + CTRL_INIT);
+	writel(0x1, core->reg_base + CPU_CS_SCIACMDARG3);
 
 	while (!ctrl_status && count < max_tries) {
 		ctrl_status = readl(core->reg_base + CTRL_STATUS);
@@ -148,7 +149,7 @@ int iris_vpu_prepare_pc(struct iris_core *core)
 	if (!wfi_status || !idle_status)
 		goto skip_power_off;
 
-	ret = core->hfi_sys_ops->sys_pc_prep(core);
+	ret = core->hfi_ops->sys_pc_prep(core);
 	if (ret)
 		goto skip_power_off;
 
@@ -213,19 +214,18 @@ int iris_vpu_power_off_controller(struct iris_core *core)
 disable_power:
 	iris_disable_unprepare_clock(core, IRIS_AHB_CLK);
 	iris_disable_unprepare_clock(core, IRIS_CTRL_CLK);
-	iris_disable_unprepare_clock(core, IRIS_AXI_VCODEC_CLK);
-	iris_disable_power_domains(core, IRIS_CTRL_POWER_DOMAIN);
+	iris_disable_unprepare_clock(core, IRIS_AXI_CLK);
+	iris_disable_power_domains(core, core->pmdomain_tbl->pd_devs[IRIS_CTRL_POWER_DOMAIN]);
 
 	return 0;
 }
 
 void iris_vpu_power_off_hw(struct iris_core *core)
 {
-	iris_genpd_set_hwmode(core, IRIS_VCODEC_POWER_DOMAIN, false);
-	iris_disable_power_domains(core, IRIS_VCODEC_POWER_DOMAIN);
-	iris_disable_unprepare_clock(core, IRIS_BSE_HW_CLK);
-	iris_disable_unprepare_clock(core, IRIS_VCODEC_AHB_CLK);
-	iris_disable_unprepare_clock(core, IRIS_VCODEC_CLK);
+	dev_pm_genpd_set_hwmode(core->pmdomain_tbl->pd_devs[IRIS_HW_POWER_DOMAIN], false);
+	iris_disable_power_domains(core, core->pmdomain_tbl->pd_devs[IRIS_HW_POWER_DOMAIN]);
+	iris_disable_unprepare_clock(core, IRIS_HW_AHB_CLK);
+	iris_disable_unprepare_clock(core, IRIS_HW_CLK);
 }
 
 void iris_vpu_power_off(struct iris_core *core)
@@ -236,7 +236,7 @@ void iris_vpu_power_off(struct iris_core *core)
 	iris_unset_icc_bw(core);
 
 	if (!iris_vpu_watchdog(core, core->intr_status))
-		disable_irq(core->irq);
+		disable_irq_nosync(core->irq);
 }
 
 int iris_vpu_power_on_controller(struct iris_core *core)
@@ -244,7 +244,7 @@ int iris_vpu_power_on_controller(struct iris_core *core)
 	u32 rst_tbl_size = core->iris_platform_data->clk_rst_tbl_size;
 	int ret;
 
-	ret = iris_enable_power_domains(core, IRIS_CTRL_POWER_DOMAIN);
+	ret = iris_enable_power_domains(core, core->pmdomain_tbl->pd_devs[IRIS_CTRL_POWER_DOMAIN]);
 	if (ret)
 		return ret;
 
@@ -252,7 +252,7 @@ int iris_vpu_power_on_controller(struct iris_core *core)
 	if (ret)
 		goto err_disable_power;
 
-	ret = iris_prepare_enable_clock(core, IRIS_AXI_VCODEC_CLK);
+	ret = iris_prepare_enable_clock(core, IRIS_AXI_CLK);
 	if (ret)
 		goto err_disable_power;
 
@@ -269,9 +269,9 @@ int iris_vpu_power_on_controller(struct iris_core *core)
 err_disable_ctrl_clock:
 	iris_disable_unprepare_clock(core, IRIS_CTRL_CLK);
 err_disable_axi_clock:
-	iris_disable_unprepare_clock(core, IRIS_AXI_VCODEC_CLK);
+	iris_disable_unprepare_clock(core, IRIS_AXI_CLK);
 err_disable_power:
-	iris_disable_power_domains(core, IRIS_CTRL_POWER_DOMAIN);
+	iris_disable_power_domains(core, core->pmdomain_tbl->pd_devs[IRIS_CTRL_POWER_DOMAIN]);
 
 	return ret;
 }
@@ -280,42 +280,31 @@ int iris_vpu_power_on_hw(struct iris_core *core)
 {
 	int ret;
 
-	ret = iris_enable_power_domains(core, IRIS_VCODEC_POWER_DOMAIN);
+	ret = iris_enable_power_domains(core, core->pmdomain_tbl->pd_devs[IRIS_HW_POWER_DOMAIN]);
 	if (ret)
 		return ret;
 
-	ret = iris_prepare_enable_clock(core, IRIS_VCODEC_CLK);
+	ret = iris_prepare_enable_clock(core, IRIS_HW_CLK);
 	if (ret)
 		goto err_disable_power;
 
-	ret = iris_prepare_enable_clock(core, IRIS_VCODEC_AHB_CLK);
+	ret = iris_prepare_enable_clock(core, IRIS_HW_AHB_CLK);
 	if (ret && ret != -ENOENT)
 		goto err_disable_hw_clock;
 
-	ret = iris_prepare_enable_clock(core, IRIS_BSE_HW_CLK);
-	if (ret && ret != -ENOENT)
-		goto err_disable_hw_ahb_clock;
-
 	return 0;
 
-err_disable_hw_ahb_clock:
-	iris_disable_unprepare_clock(core, IRIS_VCODEC_AHB_CLK);
 err_disable_hw_clock:
-	iris_disable_unprepare_clock(core, IRIS_VCODEC_CLK);
+	iris_disable_unprepare_clock(core, IRIS_HW_CLK);
 err_disable_power:
-	iris_disable_power_domains(core, IRIS_VCODEC_POWER_DOMAIN);
+	iris_disable_power_domains(core, core->pmdomain_tbl->pd_devs[IRIS_HW_POWER_DOMAIN]);
 
 	return ret;
 }
 
 int iris_vpu_set_hwmode(struct iris_core *core)
 {
-	writel(CORE_BRIDGE_SW_RESET | CORE_BRIDGE_HW_RESET_DISABLE,
-	       core->reg_base + CPU_CS_AHB_BRIDGE_SYNC_RESET);
-	writel(CORE_BRIDGE_HW_RESET_DISABLE, core->reg_base + CPU_CS_AHB_BRIDGE_SYNC_RESET);
-	writel(0x0, core->reg_base + CPU_CS_AHB_BRIDGE_SYNC_RESET);
-
-	return iris_genpd_set_hwmode(core, IRIS_VCODEC_POWER_DOMAIN, true);
+	return dev_pm_genpd_set_hwmode(core->pmdomain_tbl->pd_devs[IRIS_HW_POWER_DOMAIN], true);
 }
 
 int iris_vpu_switch_to_hwmode(struct iris_core *core)
@@ -378,9 +367,9 @@ int iris_vpu35_vpu4x_power_off_controller(struct iris_core *core)
 disable_power:
 	iris_disable_unprepare_clock(core, IRIS_CTRL_CLK);
 	iris_disable_unprepare_clock(core, IRIS_CTRL_FREERUN_CLK);
-	iris_disable_unprepare_clock(core, IRIS_AXI_CTRL_CLK);
+	iris_disable_unprepare_clock(core, IRIS_AXI1_CLK);
 
-	iris_disable_power_domains(core, IRIS_CTRL_POWER_DOMAIN);
+	iris_disable_power_domains(core, core->pmdomain_tbl->pd_devs[IRIS_CTRL_POWER_DOMAIN]);
 
 	reset_control_bulk_reset(clk_rst_tbl_size, core->resets);
 
@@ -391,11 +380,11 @@ int iris_vpu35_vpu4x_power_on_controller(struct iris_core *core)
 {
 	int ret;
 
-	ret = iris_enable_power_domains(core, IRIS_CTRL_POWER_DOMAIN);
+	ret = iris_enable_power_domains(core, core->pmdomain_tbl->pd_devs[IRIS_CTRL_POWER_DOMAIN]);
 	if (ret)
 		return ret;
 
-	ret = iris_prepare_enable_clock(core, IRIS_AXI_CTRL_CLK);
+	ret = iris_prepare_enable_clock(core, IRIS_AXI1_CLK);
 	if (ret)
 		goto err_disable_power;
 
@@ -412,9 +401,9 @@ int iris_vpu35_vpu4x_power_on_controller(struct iris_core *core)
 err_disable_ctrl_free_clk:
 	iris_disable_unprepare_clock(core, IRIS_CTRL_FREERUN_CLK);
 err_disable_axi1_clk:
-	iris_disable_unprepare_clock(core, IRIS_AXI_CTRL_CLK);
+	iris_disable_unprepare_clock(core, IRIS_AXI1_CLK);
 err_disable_power:
-	iris_disable_power_domains(core, IRIS_CTRL_POWER_DOMAIN);
+	iris_disable_power_domains(core, core->pmdomain_tbl->pd_devs[IRIS_CTRL_POWER_DOMAIN]);
 
 	return ret;
 }
@@ -424,35 +413,14 @@ void iris_vpu35_vpu4x_program_bootup_registers(struct iris_core *core)
 	writel(0x1, core->reg_base + WRAPPER_IRIS_VCODEC_VPU_WRAPPER_SPARE_0);
 }
 
-static u64 iris_get_vsp_ref_bitrate(struct iris_inst *inst)
-{
-	struct device *dev = inst->core->dev;
-	u32 codec = inst->codec;
-
-	switch (codec) {
-	case V4L2_PIX_FMT_H264:
-		return 150;
-	case V4L2_PIX_FMT_HEVC:
-		return 140;
-	case V4L2_PIX_FMT_VP9:
-		return 70;
-	case V4L2_PIX_FMT_AV1:
-		return 100;
-	default:
-		dev_err(dev, "Unsupported codec\n");
-		return 1;
-	}
-}
-
 u64 iris_vpu3x_vpu4x_calculate_frequency(struct iris_inst *inst, size_t data_size)
 {
 	struct platform_inst_caps *caps = inst->core->iris_platform_data->inst_caps;
 	struct v4l2_format *inp_f = inst->fmt_src;
 	u32 height, width, mbs_per_second, mbpf;
-	u64 vsp_ref_bitrate, vsp_ref_freq;
 	u64 fw_cycles, fw_vpp_cycles;
 	u64 vsp_cycles, vpp_cycles;
-	u32 fps = inst->frame_rate;
+	u32 fps = DEFAULT_FPS;
 
 	width = max(inp_f->fmt.pix_mp.width, inst->crop.width);
 	height = max(inp_f->fmt.pix_mp.height, inst->crop.height);
@@ -471,18 +439,8 @@ u64 iris_vpu3x_vpu4x_calculate_frequency(struct iris_inst *inst, size_t data_siz
 	if (inst->fw_caps[PIPE].value > 1)
 		vpp_cycles += div_u64(vpp_cycles * 59, 1000);
 
-	/* 1.05 is VPP FW overhead */
-	if (inst->fw_caps[STAGE].value == STAGE_2)
-		vpp_cycles += div_u64(vpp_cycles * 5, 100);
-
 	vsp_cycles = fps * data_size * 8;
-	vsp_ref_bitrate = iris_get_vsp_ref_bitrate(inst);
-	vsp_ref_freq = inst->codec == V4L2_PIX_FMT_AV1 ? 533 : 444;
-	vsp_cycles = div_u64(vsp_ref_freq * vsp_cycles, vsp_ref_bitrate);
-
-	/* VSP FW SW offset */
-	vsp_cycles = div_u64(vsp_cycles * 1000, 1055);
-
+	vsp_cycles = div_u64(vsp_cycles, 2);
 	/* VSP FW overhead 1.05 */
 	vsp_cycles = div_u64(vsp_cycles * 21, 20);
 
@@ -514,7 +472,7 @@ int iris_vpu_power_on(struct iris_core *core)
 
 	iris_opp_set_rate(core->dev, freq);
 
-	iris_vpu_set_preset_registers(core);
+	core->iris_platform_data->set_preset_registers(core);
 
 	iris_vpu_interrupt_init(core);
 	core->intr_status = 0;
@@ -530,9 +488,4 @@ err:
 	dev_err(core->dev, "power on failed\n");
 
 	return ret;
-}
-
-void iris_vpu_set_preset_registers(struct iris_core *core)
-{
-	writel(0x0, core->reg_base + 0xb0088);
 }
