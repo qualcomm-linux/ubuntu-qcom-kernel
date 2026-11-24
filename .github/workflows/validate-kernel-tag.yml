@@ -1,0 +1,158 @@
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# validate-kernel-tag.yml
+#
+# Builds one Canonical upload tag and validates distro images from it, then
+# reports on the tag's commit. That commit is the tip of resolute-qcom, where
+# whoever rebases resolute-qcom-devel onto it will look.
+#
+# Two entry points, one implementation: fetch-source-pkg.yml calls this with
+# the tag it just mirrored, and a maintainer can dispatch it with any tag to
+# get a fresh result. Each run has its own ID, so each gets its own request ID
+# and its own Check Run rather than colliding with an earlier attempt.
+
+name: "Validate: Canonical Kernel Tag"
+run-name: "Validate ${{ inputs.tag }}"
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: "Canonical upload tag, e.g. Ubuntu-qcom-7.0.0-1019.23"
+        required: true
+        type: string
+    secrets:
+      DEB_PKG_BOT_CI_TOKEN:
+        description: "Token for dispatching the distro validation request"
+        required: true
+
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Canonical upload tag, e.g. Ubuntu-qcom-7.0.0-1019.23"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# One validation per tag. A second request for the same tag supersedes the
+# first rather than racing it.
+concurrency:
+  group: validate-kernel-tag-${{ inputs.tag }}
+  cancel-in-progress: true
+
+jobs:
+  # ==========================================================================
+  # Build the tag. Called, not dispatched, so the packages land under this
+  # run's ID and the validate job below can name them without having to
+  # discover which ref some detached run built.
+  # ==========================================================================
+  build:
+    uses: ./.github/workflows/build-kernel.yml # zizmor: ignore[self-repository]
+    with:
+      ref: ${{ inputs.tag }}
+      flavours: ALL
+      dbgsym: true
+      s3_prefix: tag
+
+  # ==========================================================================
+  # No approval gate: tags are rare and a gate would only hold up the result.
+  #
+  # Runs after a failed build so the failure still lands on the commit, but not
+  # after a cancelled one: a cancellation is not a verdict, and dispatching
+  # there would start an hour of distro build for a run someone just stopped.
+  # ==========================================================================
+  validate:
+    name: "Validate distro images"
+    needs: build
+    if: ${{ !cancelled() }}
+    runs-on: [self-hosted, lecore-prd-u2404-arm64-xlrg-od-ephem]
+    permissions:
+      checks: write
+      contents: read
+      statuses: write
+    env:
+      VALIDATION_MODE: canonical-tag
+      SUBJECT: ${{ inputs.tag }}
+      REPOSITORY: ${{ github.repository }}
+      STATUS_CONTEXT: qcom-distro-images/canonical-tag
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Checkout orchestration helpers
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Install GitHub CLI
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y -o DPkg::Lock::Timeout=300 --no-install-recommends gh
+
+      - id: context
+        name: Resolve tag validation context
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KERNEL_RUN_ID: ${{ github.run_id }}
+          KERNEL_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          bash ./scripts/resolve-distro-validation-context.sh
+
+      # Leaves a red mark on the commit; without it a tag that fails to
+      # build reports nothing at all.
+      - name: Report kernel build failure
+        if: ${{ needs.build.result != 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_SHA: ${{ steps.context.outputs.head-sha }}
+          STATE: failure
+          DESCRIPTION: "Canonical kernel build failed before distro validation"
+          TARGET_URL: ${{ env.RUN_URL }}
+        run: |
+          set -euo pipefail
+          bash ./scripts/report-distro-validation-status.sh
+          exit 1
+
+      - id: check
+        name: Start distro validation Check Run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PHASE: start
+          COMMIT_SHA: ${{ steps.context.outputs.head-sha }}
+          REQUEST_ID: ${{ steps.context.outputs.request-id }}
+          KERNEL_BUILD_ID: ${{ steps.context.outputs.kernel-build-id }}
+          IMAGE_S3_PREFIX: qualcomm-linux/${{ steps.context.outputs.kernel-s3-prefix }}/${{ steps.context.outputs.kernel-build-id }}
+          DETAILS_URL: ${{ env.RUN_URL }}
+        run: |
+          set -euo pipefail
+          bash ./scripts/report-distro-validation-check.sh
+
+      - name: Report validation pending
+        if: ${{ steps.check.outputs.should-dispatch == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_SHA: ${{ steps.context.outputs.head-sha }}
+          STATE: pending
+          DESCRIPTION: "Building Canonical server and desktop distro images"
+          TARGET_URL: ${{ env.RUN_URL }}
+        run: |
+          set -euo pipefail
+          bash ./scripts/report-distro-validation-status.sh
+
+      - name: Dispatch trusted distro validation request
+        if: ${{ steps.check.outputs.should-dispatch == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.DEB_PKG_BOT_CI_TOKEN }}
+          DISTRO_REPOSITORY: qualcomm-linux/qcom-distro-images
+          KERNEL_REPOSITORY: ${{ github.repository }}
+          KERNEL_RUN_ID: ${{ steps.context.outputs.kernel-run-id }}
+          KERNEL_RUN_ATTEMPT: ${{ steps.context.outputs.kernel-run-attempt }}
+          KERNEL_BUILD_ID: ${{ steps.context.outputs.kernel-build-id }}
+          KERNEL_S3_PREFIX: ${{ steps.context.outputs.kernel-s3-prefix }}
+          HEAD_SHA: ${{ steps.context.outputs.head-sha }}
+          REQUEST_ID: ${{ steps.context.outputs.request-id }}
+        run: |
+          set -euo pipefail
+          bash ./scripts/send-distro-validation-request.sh

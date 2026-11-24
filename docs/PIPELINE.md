@@ -34,10 +34,12 @@ upstream kernel tree the packages are built from.
 
 `resolute-qcom` mirrors the upstream Ubuntu kernel: each upload is fetched and
 frozen under an immutable `Ubuntu-qcom-X.Y.Z-A.B` tag. A one-time bootstrap seeds
-the branch; thereafter an incremental sync advances it per new upstream upload and
-triggers a build. Builds produce `.deb` packages uploaded to a private S3 bucket
-(no GitHub artifacts or releases). Qualcomm contributions land on `resolute-qcom-devel`,
-never on the mirror.
+the branch; thereafter an incremental sync advances it per new upstream upload,
+builds that upload and validates distro images from it. The result is a Check
+Run on the tag's commit, which is the tip of `resolute-qcom`. Look at it before
+rebasing `resolute-qcom-devel`. Builds produce `.deb` packages uploaded to a
+private S3 bucket (no GitHub artifacts or releases). Qualcomm contributions land
+on `resolute-qcom-devel`, never on the mirror.
 
 Upstream source: [https://git.launchpad.net/~carmel-team/ubuntu/+source/linux/+git/resolute](https://git.launchpad.net/~carmel-team/ubuntu/+source/linux/+git/resolute).
 
@@ -46,8 +48,15 @@ Upstream source: [https://git.launchpad.net/~carmel-team/ubuntu/+source/linux/+g
 The maintenance workflows below are manual (`Actions → … → Run workflow`, or via `gh`):
 
 ```bash
-# Sync the mirror to the latest upstream upload (no inputs; idempotent).
+# Sync the mirror to the latest upstream upload (no inputs; idempotent). Builds
+# and validates the upload it mirrors.
 gh workflow run fetch-source-pkg.yml --repo qualcomm-linux/ubuntu-qcom-kernel
+
+# Result for the tip of resolute-qcom, the commit a rebase lands on. No output
+# means the tag was never validated.
+gh api repos/qualcomm-linux/ubuntu-qcom-kernel/commits/resolute-qcom/check-runs \
+  --jq '.check_runs[] | select(.name == "qcom-distro-images/canonical-tag")
+        | "\(.status)/\(.conclusion // "-")"'
 
 # Build .deb packages. Defaults to resolute-qcom-devel HEAD; set the ref input to
 # any branch, tag or commit, e.g. resolute-qcom for the mirror or

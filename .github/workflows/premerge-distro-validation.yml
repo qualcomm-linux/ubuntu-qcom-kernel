@@ -12,6 +12,7 @@ on: # zizmor: ignore[dangerous-triggers]
   repository_dispatch:
     types:
       - canonical-premerge-distro-result
+      - canonical-tag-distro-result
 
 permissions:
   contents: read
@@ -21,6 +22,7 @@ concurrency:
     premerge-distro-validation-${{
       github.event_name == 'repository_dispatch' && 'callback' || 'request'
     }}-${{
+      github.event.client_payload.subject ||
       github.event.client_payload.pr_number ||
       github.event.workflow_run.head_repository.full_name ||
       github.repository
@@ -42,7 +44,8 @@ jobs:
       kernel-run-attempt: ${{ steps.context.outputs.kernel-run-attempt }}
       kernel-build-id: ${{ steps.context.outputs.kernel-build-id }}
       kernel-s3-prefix: ${{ steps.context.outputs.kernel-s3-prefix }}
-      pr-number: ${{ steps.context.outputs.pr-number }}
+      validation-mode: ${{ steps.context.outputs.validation-mode }}
+      subject: ${{ steps.context.outputs.subject }}
       head-sha: ${{ steps.context.outputs.head-sha }}
       request-id: ${{ steps.context.outputs.request-id }}
     steps:
@@ -126,10 +129,11 @@ jobs:
         name: Start distro validation Check Run
         env:
           GH_TOKEN: ${{ github.token }}
-          MODE: start
+          PHASE: start
           REPOSITORY: ${{ github.repository }}
           COMMIT_SHA: ${{ needs.workflow-context.outputs.head-sha }}
-          PR_NUMBER: ${{ needs.workflow-context.outputs.pr-number }}
+          VALIDATION_MODE: ${{ needs.workflow-context.outputs.validation-mode }}
+          SUBJECT: ${{ needs.workflow-context.outputs.subject }}
           REQUEST_ID: ${{ needs.workflow-context.outputs.request-id }}
           KERNEL_BUILD_ID: ${{ needs.workflow-context.outputs.kernel-build-id }}
           IMAGE_S3_PREFIX: qualcomm-linux/${{ needs.workflow-context.outputs.kernel-s3-prefix }}/${{ needs.workflow-context.outputs.kernel-build-id }}
@@ -161,7 +165,8 @@ jobs:
           KERNEL_RUN_ATTEMPT: ${{ needs.workflow-context.outputs.kernel-run-attempt }}
           KERNEL_BUILD_ID: ${{ needs.workflow-context.outputs.kernel-build-id }}
           KERNEL_S3_PREFIX: ${{ needs.workflow-context.outputs.kernel-s3-prefix }}
-          PR_NUMBER: ${{ needs.workflow-context.outputs.pr-number }}
+          VALIDATION_MODE: ${{ needs.workflow-context.outputs.validation-mode }}
+          SUBJECT: ${{ needs.workflow-context.outputs.subject }}
           HEAD_SHA: ${{ needs.workflow-context.outputs.head-sha }}
           REQUEST_ID: ${{ needs.workflow-context.outputs.request-id }}
         run: |
@@ -240,7 +245,8 @@ jobs:
       state: ${{ steps.callback.outputs.state }}
       description: ${{ steps.callback.outputs.description }}
       check-conclusion: ${{ steps.callback.outputs.check-conclusion }}
-      pr-number: ${{ steps.callback.outputs.pr-number }}
+      validation-mode: ${{ steps.callback.outputs.validation-mode }}
+      subject: ${{ steps.callback.outputs.subject }}
       head-sha: ${{ steps.callback.outputs.head-sha }}
       request-id: ${{ steps.callback.outputs.request-id }}
       kernel-build-id: ${{ steps.callback.outputs.kernel-build-id }}
@@ -292,10 +298,11 @@ jobs:
       - name: Publish final status and summary
         env:
           GH_TOKEN: ${{ github.token }}
-          MODE: complete
+          PHASE: complete
           REPOSITORY: ${{ github.repository }}
           COMMIT_SHA: ${{ needs.callback-context.outputs.head-sha }}
-          PR_NUMBER: ${{ needs.callback-context.outputs.pr-number }}
+          VALIDATION_MODE: ${{ needs.callback-context.outputs.validation-mode }}
+          SUBJECT: ${{ needs.callback-context.outputs.subject }}
           REQUEST_ID: ${{ needs.callback-context.outputs.request-id }}
           KERNEL_BUILD_ID: ${{ needs.callback-context.outputs.kernel-build-id }}
           CONCLUSION: ${{ needs.callback-context.outputs.check-conclusion }}
@@ -308,11 +315,12 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "## Canonical Premerge Distro Validation"
+            echo "## Canonical Distro Image Validation"
             echo
             echo "| Field | Value |"
             echo "|-------|-------|"
-            echo "| Pull request | \`#${PR_NUMBER}\` |"
+            echo "| Mode | \`${VALIDATION_MODE}\` |"
+            echo "| Subject | \`${SUBJECT}\` |"
             echo "| Result | \`${STATE}\` |"
             echo "| Kernel build ID | \`${KERNEL_BUILD_ID}\` |"
             echo "| Distro build ID | \`${DISTRO_BUILD_ID}\` |"
