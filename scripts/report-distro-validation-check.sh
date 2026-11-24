@@ -4,16 +4,16 @@
 #
 set -euo pipefail
 
-: "${MODE:?MODE is required}"
+: "${PHASE:?PHASE is required}"
+: "${VALIDATION_MODE:?VALIDATION_MODE is required}"
 : "${REPOSITORY:?REPOSITORY is required}"
 : "${COMMIT_SHA:?COMMIT_SHA is required}"
-: "${PR_NUMBER:?PR_NUMBER is required}"
+: "${SUBJECT:?SUBJECT is required}"
 : "${REQUEST_ID:?REQUEST_ID is required}"
 : "${KERNEL_BUILD_ID:?KERNEL_BUILD_ID is required}"
 : "${IMAGE_S3_PREFIX:?IMAGE_S3_PREFIX is required}"
 : "${DETAILS_URL:?DETAILS_URL is required}"
 
-CHECK_NAME="qcom-distro-images/canonical-premerge"
 CONCLUSION="${CONCLUSION:-}"
 DISTRO_BUILD_ID="${DISTRO_BUILD_ID:-pending}"
 
@@ -22,16 +22,31 @@ emit_output() {
   echo "$1=$2" >> "$GITHUB_OUTPUT"
 }
 
-[[ "$MODE" =~ ^(start|complete)$ ]] || { echo "::error::Invalid Check Run mode: ${MODE}" >&2; exit 1; }
+[[ "$PHASE" =~ ^(start|complete)$ ]] || { echo "::error::Invalid Check Run phase: ${PHASE}" >&2; exit 1; }
 [[ "$REPOSITORY" == "qualcomm-linux/ubuntu-qcom-kernel" ]] || { echo "::error::Unexpected repository: ${REPOSITORY}" >&2; exit 1; }
 [[ "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Invalid commit SHA: ${COMMIT_SHA}" >&2; exit 1; }
-[[ "$PR_NUMBER" =~ ^[0-9]+$ ]] || { echo "::error::Invalid pull request number: ${PR_NUMBER}" >&2; exit 1; }
+
+case "$VALIDATION_MODE" in
+  canonical-premerge)
+    [[ "$SUBJECT" =~ ^[0-9]+$ ]] || { echo "::error::Invalid pull request number: ${SUBJECT}" >&2; exit 1; }
+    subject_label="PR #${SUBJECT}"
+    ;;
+  canonical-tag)
+    [[ "$SUBJECT" =~ ^Ubuntu-qcom-[0-9]+\.[0-9]+\.[0-9]+-[0-9]+\.[0-9]+$ ]] || { echo "::error::Invalid Canonical tag: ${SUBJECT}" >&2; exit 1; }
+    subject_label="$SUBJECT"
+    ;;
+  *)
+    echo "::error::Invalid validation mode: ${VALIDATION_MODE}" >&2; exit 1
+    ;;
+esac
+CHECK_NAME="qcom-distro-images/${VALIDATION_MODE}"
+
 [[ "$KERNEL_BUILD_ID" =~ ^[0-9]+-[0-9]+$ ]] || { echo "::error::Invalid kernel build ID: ${KERNEL_BUILD_ID}" >&2; exit 1; }
 [[ "$REQUEST_ID" == "${KERNEL_BUILD_ID}-${COMMIT_SHA}" ]] || { echo "::error::Request ID does not match the kernel build and commit SHA." >&2; exit 1; }
-[[ "$IMAGE_S3_PREFIX" == "qualcomm-linux/pkg/premerge/ubuntu-qcom-kernel/${KERNEL_BUILD_ID}" ]] || { echo "::error::Unexpected image S3 prefix: ${IMAGE_S3_PREFIX}" >&2; exit 1; }
+[[ "$IMAGE_S3_PREFIX" == "qualcomm-linux/pkg/${VALIDATION_MODE#canonical-}/ubuntu-qcom-kernel/${KERNEL_BUILD_ID}" ]] || { echo "::error::Unexpected image S3 prefix: ${IMAGE_S3_PREFIX}" >&2; exit 1; }
 [[ "$DETAILS_URL" =~ ^https://github\.com/qualcomm-linux/(ubuntu-qcom-kernel|qcom-distro-images)/actions/runs/[0-9]+$ ]] || { echo "::error::Unexpected Check Run details URL: ${DETAILS_URL}" >&2; exit 1; }
 
-if [[ "$MODE" == "complete" ]]; then
+if [[ "$PHASE" == "complete" ]]; then
   [[ "$CONCLUSION" =~ ^(success|failure|cancelled|skipped)$ ]] || { echo "::error::Invalid Check Run conclusion: ${CONCLUSION}" >&2; exit 1; }
   [[ "$DISTRO_BUILD_ID" =~ ^[0-9]+-[0-9]+$ ]] || { echo "::error::Invalid distro build ID: ${DISTRO_BUILD_ID}" >&2; exit 1; }
 fi
@@ -52,11 +67,11 @@ if [[ "$matching_count" -gt 1 ]]; then
   exit 1
 fi
 
-check_title="Canonical premerge distro validation"
-check_summary="Building Canonical server and desktop images for PR #${PR_NUMBER}."
+check_title="Canonical ${VALIDATION_MODE#canonical-} distro validation"
+check_summary="Building Canonical server and desktop images for ${subject_label}."
 check_text="$IMAGE_S3_PREFIX"
 
-if [[ "$MODE" == "start" ]]; then
+if [[ "$PHASE" == "start" ]]; then
   if [[ "$matching_count" == "1" ]]; then
     existing_status="$(jq -r '.[0].status' <<< "$matching_checks")"
     existing_url="$(jq -r '.[0].html_url' <<< "$matching_checks")"
@@ -78,7 +93,7 @@ if [[ "$MODE" == "start" ]]; then
     superseded_payload="$(jq -n \
       --arg details_url "$DETAILS_URL" \
       --arg title "$check_title" \
-      --arg summary "Superseded by a newer Canonical premerge validation request." \
+      --arg summary "Superseded by a newer Canonical ${VALIDATION_MODE#canonical-} validation request." \
       --arg text "Superseding request ID: \`${REQUEST_ID}\`" \
       '{
         status: "completed",
@@ -142,16 +157,16 @@ existing_url="$(jq -r '.[0].html_url' <<< "$matching_checks")"
 
 case "$CONCLUSION" in
   success)
-    check_summary="Canonical server and desktop distro images passed for PR #${PR_NUMBER}."
+    check_summary="Canonical server and desktop distro images passed for ${subject_label}."
     ;;
   failure)
-    check_summary="Canonical distro image validation failed for PR #${PR_NUMBER}."
+    check_summary="Canonical distro image validation failed for ${subject_label}."
     ;;
   cancelled)
-    check_summary="Canonical distro image validation was cancelled for PR #${PR_NUMBER}."
+    check_summary="Canonical distro image validation was cancelled for ${subject_label}."
     ;;
   skipped)
-    check_summary="Canonical distro image validation was skipped for PR #${PR_NUMBER}."
+    check_summary="Canonical distro image validation was skipped for ${subject_label}."
     ;;
 esac
 

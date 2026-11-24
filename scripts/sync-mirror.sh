@@ -177,6 +177,7 @@ if [ "${#MISSING[@]}" -eq 0 ]; then
   log "Already up to date -- no new uploads to mirror."
   [ -n "${GITHUB_OUTPUT:-}" ] && {
     echo "synced_version=" >> "${GITHUB_OUTPUT}"
+    echo "synced_tag="     >> "${GITHUB_OUTPUT}"
     echo "synced_count=0"   >> "${GITHUB_OUTPUT}"
   }
   exit 0
@@ -274,5 +275,6 @@ log "Sync complete: ${SYNCED} upload(s) mirrored; branch now at ${LAST_VERSION}.
 
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
   echo "synced_version=${LAST_VERSION}" >> "${GITHUB_OUTPUT}"
+  echo "synced_tag=${UPSTREAM_PREFIX}-${LAST_VERSION}" >> "${GITHUB_OUTPUT}"
   echo "synced_count=${SYNCED}"          >> "${GITHUB_OUTPUT}"
 fi

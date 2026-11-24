@@ -99,6 +99,7 @@ jobs:
 
     outputs:
       synced_version: ${{ steps.sync.outputs.synced_version }}
+      synced_tag:     ${{ steps.sync.outputs.synced_tag }}
       synced_count:   ${{ steps.sync.outputs.synced_count }}
 
     steps:
@@ -142,23 +143,21 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ==========================================================================
-  # Job 3 - trigger a kernel build for the newest mirrored upload.
+  # Job 3 - build and validate the newest mirrored upload.
   # ==========================================================================
-  trigger-build:
-    name: "Trigger kernel build"
-    runs-on: ubuntu-24.04-arm
-    needs: [check-version, sync]
+  validate:
+    needs: sync
     if: needs.sync.result == 'success' && needs.sync.outputs.synced_count != '0'
+    # A called workflow's token can only be narrowed, never widened, so the
+    # Check Run and commit status it posts have to be granted here.
     permissions:
-      actions: write
-
-    steps:
-      - name: Dispatch build-kernel workflow
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION:  ${{ needs.sync.outputs.synced_version }}
-        run: |
-          echo "Building ${UPSTREAM_PREFIX}-${VERSION}"
-          gh workflow run build-kernel.yml \
-            --repo "${{ github.repository }}" \
-            --field ref="${UPSTREAM_PREFIX}-${VERSION}"
+      checks: write
+      contents: read
+      statuses: write
+    uses: ./.github/workflows/validate-kernel-tag.yml # zizmor: ignore[self-repository]
+    with:
+      tag: ${{ needs.sync.outputs.synced_tag }}
+    # Named rather than inherited: the only secret down this path is the one
+    # that dispatches to qcom-distro-images.
+    secrets:
+      DEB_PKG_BOT_CI_TOKEN: ${{ secrets.DEB_PKG_BOT_CI_TOKEN }}

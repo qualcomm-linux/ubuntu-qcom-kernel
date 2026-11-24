@@ -2,6 +2,12 @@
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 # SPDX-License-Identifier: BSD-3-Clause
 #
+# Resolves the context for one distro image validation. The mode it emits
+# decides the rest of the names:
+#   Check Run    qcom-distro-images/<mode>
+#   packages     pkg/<mode without canonical->/ubuntu-qcom-kernel
+#   dispatches   <mode>-validation, <mode>-distro-result
+#
 set -euo pipefail
 
 : "${GITHUB_EVENT_NAME:?GITHUB_EVENT_NAME is required}"
@@ -12,22 +18,41 @@ emit_output() {
   echo "${name}=${value}" >> "$GITHUB_OUTPUT"
 }
 
-validate_common() {
-  local run_id="$1"
-  local run_attempt="$2"
-  local pr_number="$3"
-  local head_sha="$4"
+validate_subject() {
+  local mode="$1"
+  local subject="$2"
 
+  case "$mode" in
+    canonical-premerge)
+      [[ "$subject" =~ ^[0-9]+$ ]] || { echo "::error::Invalid pull request number: ${subject}" >&2; exit 1; }
+      ;;
+    canonical-tag)
+      [[ "$subject" =~ ^Ubuntu-qcom-[0-9]+\.[0-9]+\.[0-9]+-[0-9]+\.[0-9]+$ ]] || { echo "::error::Invalid Canonical tag: ${subject}" >&2; exit 1; }
+      ;;
+    *)
+      echo "::error::Invalid validation mode: ${mode}" >&2; exit 1
+      ;;
+  esac
+}
+
+validate_common() {
+  local mode="$1"
+  local subject="$2"
+  local run_id="$3"
+  local run_attempt="$4"
+  local head_sha="$5"
+
+  validate_subject "$mode" "$subject"
   [[ "$run_id" =~ ^[0-9]+$ ]] || { echo "::error::Invalid kernel workflow run ID: ${run_id}" >&2; exit 1; }
   [[ "$run_attempt" =~ ^[0-9]+$ ]] || { echo "::error::Invalid kernel workflow run attempt: ${run_attempt}" >&2; exit 1; }
-  [[ "$pr_number" =~ ^[0-9]+$ ]] || { echo "::error::Invalid pull request number: ${pr_number}" >&2; exit 1; }
-  [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Invalid pull request head SHA: ${head_sha}" >&2; exit 1; }
+  [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Invalid commit SHA: ${head_sha}" >&2; exit 1; }
 
+  emit_output validation-mode "$mode"
+  emit_output subject "$subject"
   emit_output kernel-build-id "${run_id}-${run_attempt}"
   emit_output kernel-run-id "$run_id"
   emit_output kernel-run-attempt "$run_attempt"
-  emit_output kernel-s3-prefix "pkg/premerge/ubuntu-qcom-kernel"
-  emit_output pr-number "$pr_number"
+  emit_output kernel-s3-prefix "pkg/${mode#canonical-}/ubuntu-qcom-kernel"
   emit_output head-sha "$head_sha"
   emit_output request-id "${run_id}-${run_attempt}-${head_sha}"
 }
@@ -73,7 +98,7 @@ if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
   }
   pr_number="$(jq -r '.[0].number' <<< "$pull_requests")"
 
-  validate_common "$run_id" "$run_attempt" "$pr_number" "$head_sha"
+  validate_common canonical-premerge "$pr_number" "$run_id" "$run_attempt" "$head_sha"
   emit_output kernel-conclusion "$conclusion"
   if [[ "$conclusion" == "success" ]]; then
     emit_output should-validate "true"
@@ -83,13 +108,27 @@ if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
   exit 0
 fi
 
+# Used by the sync workflow for a freshly mirrored tag, and to re-validate by
+# hand. A re-run gets a new run ID, so its request ID cannot collide with the
+# Check Run of the attempt it replaces.
 if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+  : "${VALIDATION_MODE:?VALIDATION_MODE is required}"
+  : "${SUBJECT:?SUBJECT is required}"
   : "${KERNEL_RUN_ID:?KERNEL_RUN_ID is required}"
   : "${KERNEL_RUN_ATTEMPT:?KERNEL_RUN_ATTEMPT is required}"
-  : "${PR_NUMBER:?PR_NUMBER is required}"
-  : "${PR_HEAD_SHA:?PR_HEAD_SHA is required}"
 
-  validate_common "$KERNEL_RUN_ID" "$KERNEL_RUN_ATTEMPT" "$PR_NUMBER" "$PR_HEAD_SHA"
+  # The subject reaches a URL path below, so check it first.
+  validate_subject "$VALIDATION_MODE" "$SUBJECT"
+
+  if [[ "$VALIDATION_MODE" == "canonical-tag" ]]; then
+    # Dereferences an annotated tag to its commit in one call.
+    head_sha="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${SUBJECT}" --jq '.sha')"
+  else
+    : "${COMMIT_SHA:?COMMIT_SHA is required}"
+    head_sha="$COMMIT_SHA"
+  fi
+
+  validate_common "$VALIDATION_MODE" "$SUBJECT" "$KERNEL_RUN_ID" "$KERNEL_RUN_ATTEMPT" "$head_sha"
   emit_output kernel-conclusion "success"
   emit_output should-validate "true"
   exit 0
