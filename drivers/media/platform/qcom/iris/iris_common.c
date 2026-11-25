@@ -50,7 +50,7 @@ int iris_set_core_id(struct iris_inst *inst)
 {
 	const struct iris_hfi_session_ops *hfi_ops = inst->hfi_session_ops;
 
-	if (!inst->core->iris_platform_data->dual_core)
+	if (!inst->core_id || !hfi_ops->session_set_core_id)
 		return 0;
 
 	return hfi_ops->session_set_core_id(inst, inst->core_id);

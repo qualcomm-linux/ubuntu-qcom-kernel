@@ -2644,27 +2644,7 @@
 
 		iris: video-codec@2000000 {
 			compatible = "qcom,kaanapali-iris";
-
 			reg = <0x0 0x02000000 0x0 0xf0000>;
-
-			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
-
-			power-domains = <&videocc VIDEO_CC_MVS0C_GDSC>,
-					<&videocc VIDEO_CC_MVS0_GDSC>,
-					<&videocc VIDEO_CC_MVS0_VPP0_GDSC>,
-					<&videocc VIDEO_CC_MVS0_VPP1_GDSC>,
-					<&videocc VIDEO_CC_MVS0A_GDSC>,
-					<&rpmhpd RPMHPD_MXC>,
-					<&rpmhpd RPMHPD_MMCX>;
-			power-domain-names = "venus",
-					     "vcodec0",
-					     "vpp0",
-					     "vpp1",
-					     "apv",
-					     "mxc",
-					     "mmcx";
-
-			operating-points-v2 = <&iris_opp_table>;
 
 			clocks = <&gcc GCC_VIDEO_AXI0_CLK>,
 				 <&videocc VIDEO_CC_MVS0C_CLK>,
@@ -2687,6 +2667,8 @@
 				      "vcodec_vpp1",
 				      "vcodec_apv";
 
+			dma-coherent;
+
 			interconnects = <&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
 					 &config_noc SLAVE_VENUS_CFG QCOM_ICC_TAG_ACTIVE_ONLY>,
 					<&mmss_noc MASTER_VIDEO_MVP QCOM_ICC_TAG_ALWAYS
@@ -2694,7 +2676,26 @@
 			interconnect-names = "cpu-cfg",
 					     "video-mem";
 
+			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
+
 			memory-region = <&video_mem>;
+
+			operating-points-v2 = <&iris_opp_table>;
+
+			power-domains = <&videocc VIDEO_CC_MVS0C_GDSC>,
+					<&videocc VIDEO_CC_MVS0_GDSC>,
+					<&rpmhpd RPMHPD_MXC>,
+					<&rpmhpd RPMHPD_MMCX>,
+					<&videocc VIDEO_CC_MVS0_VPP0_GDSC>,
+					<&videocc VIDEO_CC_MVS0_VPP1_GDSC>,
+					<&videocc VIDEO_CC_MVS0A_GDSC>;
+			power-domain-names = "venus",
+					     "vcodec0",
+					     "mxc",
+					     "mmcx",
+					     "vpp0",
+					     "vpp1",
+					     "apv";
 
 			resets = <&gcc GCC_VIDEO_AXI0_CLK_ARES>,
 				 <&gcc GCC_VIDEO_AXI1_CLK_ARES>,
@@ -2702,22 +2703,25 @@
 				 <&videocc VIDEO_CC_MVS0_FREERUN_CLK_ARES>;
 			reset-names = "bus0",
 				      "bus1",
-				      "core_freerun_reset",
-				      "vcodec0_core_freerun_reset";
+				      "core",
+				      "vcodec0_core";
 
-			iommus = <&apps_smmu 0x1940 0x0>,
-				 <&apps_smmu 0x1943 0x0>,
-				 <&apps_smmu 0x1944 0x0>,
-				 <&apps_smmu 0x1a20 0x0>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			dma-ranges = <0x0 0x0 0x0 0xffc00000>;
 
-			dma-coherent;
-
-			/*
-			 * IRIS firmware is signed by vendors, only
-			 * enable on boards where the proper signed firmware
-			 * is available.
-			 */
 			status = "disabled";
+
+			non-pixel {
+				iommus = <&apps_smmu 0x1940 0x0>,
+					 <&apps_smmu 0x1944 0x0>,
+					 <&apps_smmu 0x1a20 0x0>;
+				iommu-ranges = <0x25800000 0xda400000>;
+			};
+
+			pixel {
+				iommus = <&apps_smmu 0x1943 0x0>;
+			};
 
 			iris_opp_table: opp-table {
 				compatible = "operating-points-v2";
@@ -2725,8 +2729,8 @@
 				opp-240000000 {
 					opp-hz = /bits/ 64 <240000000 240000000
 							    240000000 360000000>;
-					required-opps = <&rpmhpd_opp_low_svs>,
-							<&rpmhpd_opp_low_svs>;
+					required-opps = <&rpmhpd_opp_low_svs_d1>,
+							<&rpmhpd_opp_low_svs_d1>;
 				};
 
 				opp-338000000 {
@@ -2746,35 +2750,35 @@
 				opp-444000000 {
 					opp-hz = /bits/ 64 <444000000 444000000
 							    444000000 666000000>;
-					required-opps = <&rpmhpd_opp_svs_l1>,
+					required-opps = <&rpmhpd_opp_svs>,
 							<&rpmhpd_opp_svs_l1>;
 				};
 
 				opp-533000000 {
 					opp-hz = /bits/ 64 <533000000 533000000
 							    533000000 800000000>;
-					required-opps = <&rpmhpd_opp_nom>,
+					required-opps = <&rpmhpd_opp_svs>,
 							<&rpmhpd_opp_nom>;
 				};
 
 				opp-630000000 {
 					opp-hz = /bits/ 64 <630000000 630000000
 							    630000000 1104000000>;
-					required-opps = <&rpmhpd_opp_turbo>,
+					required-opps = <&rpmhpd_opp_svs_l1>,
 							<&rpmhpd_opp_turbo>;
 				};
 
 				opp-800000000 {
 					opp-hz = /bits/ 64 <800000000 630000000
 							    630000000 1260000000>;
-					required-opps = <&rpmhpd_opp_turbo_l0>,
+					required-opps = <&rpmhpd_opp_svs_l1>,
 							<&rpmhpd_opp_turbo_l0>;
 				};
 
 				opp-1000000000 {
 					opp-hz = /bits/ 64 <1000000000 630000000
 							    850000000 1260000000>;
-					required-opps = <&rpmhpd_opp_turbo_l1>,
+					required-opps = <&rpmhpd_opp_nom>,
 							<&rpmhpd_opp_turbo_l1>;
 				};
 			};

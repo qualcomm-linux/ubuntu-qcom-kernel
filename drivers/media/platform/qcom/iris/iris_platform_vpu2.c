@@ -13,8 +13,17 @@
 #include "iris_vpu_common.h"
 #include "iris_instance.h"
 
+#include "iris_platform_milos.h"
 #include "iris_platform_sc7280.h"
 #include "iris_platform_sm8250.h"
+
+#define WRAPPER_INTR_STATUS_A2HWD_BMSK		BIT(3)
+
+static const struct iris_firmware_desc iris_milos_desc = {
+	.firmware_data = &iris_hfi_milos_data,
+	.get_vpu_buffer_size = iris_vpu_buf_size,
+	.fwname = "qcom/vpu/vpu20_p2_gen2_s7.mbn",
+};
 
 static const struct iris_firmware_desc iris_vpu20_p1_gen1_desc = {
 	.firmware_data = &iris_hfi_gen1_data,
@@ -35,9 +44,9 @@ static const struct iris_firmware_desc iris_vpu20_p4_gen1_desc = {
 };
 
 static const u32 iris_fmts_vpu2_dec[] = {
-	[IRIS_FMT_H264] = V4L2_PIX_FMT_H264,
-	[IRIS_FMT_HEVC] = V4L2_PIX_FMT_HEVC,
-	[IRIS_FMT_VP9] = V4L2_PIX_FMT_VP9,
+	V4L2_PIX_FMT_H264,
+	V4L2_PIX_FMT_HEVC,
+	V4L2_PIX_FMT_VP9,
 };
 
 static struct platform_inst_caps platform_inst_cap_vpu2 = {
@@ -59,18 +68,6 @@ static const struct icc_info iris_icc_info_vpu2[] = {
 
 static const char * const iris_clk_reset_table_vpu2[] = { "bus", "core" };
 
-static const struct platform_pd_data iris_pmdomain_table_vpu2 = {
-	.pd_types = (enum platform_pm_domain_type []) {
-		IRIS_CTRL_POWER_DOMAIN,
-		IRIS_VCODEC_POWER_DOMAIN,
-	},
-	.pd_names = (const char *[]) {
-		"venus",
-		"vcodec0",
-	},
-	.pd_count = 2,
-};
-
 static const struct tz_cp_config tz_cp_config_vpu2[] = {
 	{
 		.cp_start = 0,
@@ -78,6 +75,32 @@ static const struct tz_cp_config tz_cp_config_vpu2[] = {
 		.cp_nonpixel_start = 0x01000000,
 		.cp_nonpixel_size = 0x24800000,
 	},
+};
+
+const struct iris_platform_data milos_data = {
+	.firmware_desc_gen1 = &iris_milos_desc,
+	.vpu_ops = &iris_vpu2_ops,
+	.icc_tbl = iris_icc_info_milos,
+	.icc_tbl_size = ARRAY_SIZE(iris_icc_info_milos),
+	.bw_tbl_dec = sm8250_bw_table_dec,
+	.bw_tbl_dec_size = ARRAY_SIZE(sm8250_bw_table_dec),
+	.ctrl_data = &sm8250_ctrl_data,
+	.vcodec_data = sm8250_vcodec_data,
+	.opp_pd_tbl = milos_opp_pd_table,
+	.opp_pd_tbl_size = ARRAY_SIZE(milos_opp_pd_table),
+	.opp_clk_tbl = sm8250_opp_clk_table,
+	.clk_rst_tbl = iris_clk_reset_table_vpu2,
+	.clk_rst_tbl_size = ARRAY_SIZE(iris_clk_reset_table_vpu2),
+	.dma_mask = 0xe0000000 - 1,
+	.inst_iris_fmts = iris_fmts_vpu2_dec,
+	.inst_iris_fmts_size = ARRAY_SIZE(iris_fmts_vpu2_dec),
+	.inst_caps = &platform_inst_cap_milos,
+	.tz_cp_config_data = tz_cp_config_vpu2,
+	.tz_cp_config_data_size = ARRAY_SIZE(tz_cp_config_vpu2),
+	.num_vpp_pipe = 2,
+	.max_session_count = 16,
+	.max_core_mbpf = ((4096 * 2176) / 256) * 2,
+	.max_core_mbps = ((3840 * 2176) / 256) * 30 + ((1920 * 1088) / 256) * 30,
 };
 
 const struct iris_platform_data sc7280_data = {
@@ -88,11 +111,10 @@ const struct iris_platform_data sc7280_data = {
 	.icc_tbl_size = ARRAY_SIZE(iris_icc_info_vpu2),
 	.bw_tbl_dec = sc7280_bw_table_dec,
 	.bw_tbl_dec_size = ARRAY_SIZE(sc7280_bw_table_dec),
-	.pmdomain_tbl = &iris_pmdomain_table_vpu2,
+	.ctrl_data = &sc7280_ctrl_data,
+	.vcodec_data = sc7280_vcodec_data,
 	.opp_pd_tbl = sc7280_opp_pd_table,
 	.opp_pd_tbl_size = ARRAY_SIZE(sc7280_opp_pd_table),
-	.clk_tbl = sc7280_clk_table,
-	.clk_tbl_size = ARRAY_SIZE(sc7280_clk_table),
 	.opp_clk_tbl = sc7280_opp_clk_table,
 	/* Upper bound of DMA address range */
 	.dma_mask = 0xe0000000 - 1,
@@ -104,6 +126,8 @@ const struct iris_platform_data sc7280_data = {
 	.tz_cp_config_data_size = ARRAY_SIZE(tz_cp_config_vpu2),
 	.num_vpp_pipe = 1,
 	.no_aon = true,
+	.wd_intr_mask = WRAPPER_INTR_STATUS_A2HWD_BMSK,
+	.icc_ib_multiplier = 1,
 	.max_session_count = 16,
 	.max_core_mbpf = 4096 * 2176 / 256 * 2 + 1920 * 1088 / 256,
 	/* max spec for SC7280 is 4096x2176@60fps */
@@ -119,11 +143,10 @@ const struct iris_platform_data sm8250_data = {
 	.clk_rst_tbl_size = ARRAY_SIZE(iris_clk_reset_table_vpu2),
 	.bw_tbl_dec = sm8250_bw_table_dec,
 	.bw_tbl_dec_size = ARRAY_SIZE(sm8250_bw_table_dec),
-	.pmdomain_tbl = &iris_pmdomain_table_vpu2,
+	.ctrl_data = &sm8250_ctrl_data,
+	.vcodec_data = sm8250_vcodec_data,
 	.opp_pd_tbl = sm8250_opp_pd_table,
 	.opp_pd_tbl_size = ARRAY_SIZE(sm8250_opp_pd_table),
-	.clk_tbl = sm8250_clk_table,
-	.clk_tbl_size = ARRAY_SIZE(sm8250_clk_table),
 	.opp_clk_tbl = sm8250_opp_clk_table,
 	/* Upper bound of DMA address range */
 	.dma_mask = 0xe0000000 - 1,
@@ -133,6 +156,8 @@ const struct iris_platform_data sm8250_data = {
 	.tz_cp_config_data = tz_cp_config_vpu2,
 	.tz_cp_config_data_size = ARRAY_SIZE(tz_cp_config_vpu2),
 	.num_vpp_pipe = 4,
+	.wd_intr_mask = WRAPPER_INTR_STATUS_A2HWD_BMSK,
+	.icc_ib_multiplier = 1,
 	.max_session_count = 16,
 	.max_core_mbpf = NUM_MBS_8K,
 	.max_core_mbps = ((7680 * 4320) / 256) * 60,

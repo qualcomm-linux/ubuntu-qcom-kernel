@@ -15,20 +15,24 @@ description:
 
 properties:
   compatible:
-    const: qcom,glymur-iris
+    oneOf:
+      - items:
+          - const: qcom,nord-iris
+          - const: qcom,glymur-iris
+      - const: qcom,glymur-iris
 
   clocks:
     maxItems: 9
 
   clock-names:
     items:
-      - const: iface
+      - const: core_iface
       - const: core
       - const: vcodec0_core
-      - const: iface1
+      - const: vcodec0_iface
       - const: core_freerun
       - const: vcodec0_core_freerun
-      - const: iface2
+      - const: vcodec1_iface
       - const: vcodec1_core
       - const: vcodec1_core_freerun
 
@@ -42,11 +46,11 @@ properties:
       - const: cpu-cfg
       - const: video-mem
 
-  iommus:
-    maxItems: 4
-
-  iommu-map:
-    maxItems: 1
+  non-pixel:
+    type: object
+    properties:
+      iommus:
+        maxItems: 3
 
   operating-points-v2: true
   opp-table:
@@ -68,24 +72,20 @@ properties:
 
   reset-names:
     items:
-      - const: bus0
-      - const: bus1
+      - const: core_bus
+      - const: vcodec0_bus
       - const: core
       - const: vcodec0_core
-      - const: bus2
+      - const: vcodec1_bus
       - const: vcodec1_core
 
 required:
-  - compatible
-  - reg
   - clocks
   - clock-names
+  - compatible
   - dma-coherent
   - interconnects
   - interconnect-names
-  - interrupts
-  - iommus
-  - memory-region
   - power-domains
   - power-domain-names
   - resets
@@ -99,29 +99,28 @@ unevaluatedProperties: false
 examples:
   - |
     #include <dt-bindings/interrupt-controller/arm-gic.h>
-    #include <dt-bindings/media/qcom,glymur-iris.h>
     #include <dt-bindings/power/qcom,rpmhpd.h>
 
     video-codec@aa00000 {
         compatible = "qcom,glymur-iris";
         reg = <0x0aa00000 0xf0000>;
 
-        clocks = <&gcc_video_axi0_clk>,
+        clocks = <&gcc_video_axi0c_clk>,
                  <&videocc_mvs0c_clk>,
                  <&videocc_mvs0_clk>,
-                 <&gcc_video_axi0c_clk>,
+                 <&gcc_video_axi0_clk>,
                  <&videocc_mvs0c_freerun_clk>,
                  <&videocc_mvs0_freerun_clk>,
                  <&gcc_video_axi1_clk>,
                  <&videocc_mvs1_clk>,
                  <&videocc_mvs1_freerun_clk>;
-        clock-names = "iface",
+        clock-names = "core_iface",
                       "core",
                       "vcodec0_core",
-                      "iface1",
+                      "vcodec0_iface",
                       "core_freerun",
                       "vcodec0_core_freerun",
-                      "iface2",
+                      "vcodec1_iface",
                       "vcodec1_core",
                       "vcodec1_core_freerun";
 
@@ -133,13 +132,6 @@ examples:
                              "video-mem";
 
         interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
-
-        iommus = <&apps_smmu 0x1940 0x0>,
-                 <&apps_smmu 0x1943 0x0>,
-                 <&apps_smmu 0x1944 0x0>,
-                 <&apps_smmu 0x19e0 0x0>;
-
-        iommu-map = <IOMMU_FID_IRIS_FIRMWARE &apps_smmu 0x19e2 0x1>;
 
         memory-region = <&video_mem>;
 
@@ -156,18 +148,37 @@ examples:
                              "mmcx",
                              "vcodec1";
 
-        resets = <&gcc_video_axi0_clk_ares>,
-                 <&gcc_video_axi0c_clk_ares>,
+        resets = <&gcc_video_axi0c_clk_ares>,
+                 <&gcc_video_axi0_clk_ares>,
                  <&videocc_mvs0c_freerun_clk_ares>,
                  <&videocc_mvs0_freerun_clk_ares>,
                  <&gcc_video_axi1_clk_ares>,
                  <&videocc_mvs1_freerun_clk_ares>;
-        reset-names = "bus0",
-                      "bus1",
+        reset-names = "core_bus",
+                      "vcodec0_bus",
                       "core",
                       "vcodec0_core",
-                      "bus2",
+                      "vcodec1_bus",
                       "vcodec1_core";
+
+        #address-cells = <1>;
+        #size-cells = <1>;
+        dma-ranges = <0x0 0x0 0xffe00000>;
+
+        non-pixel {
+            iommus = <&apps_smmu 0x1940 0x0000>,
+                     <&apps_smmu 0x1944 0x0000>,
+                     <&apps_smmu 0x19e0 0x0000>;
+            iommu-ranges = <0x25800000 0xda600000>;
+        };
+
+        pixel {
+            iommus = <&apps_smmu 0x1943 0x0000>;
+        };
+
+        video-firmware {
+            iommus = <&apps_smmu 0x19e2 0x0000>;
+        };
 
         iris_opp_table: opp-table {
             compatible = "operating-points-v2";

@@ -673,6 +673,16 @@
 	};
 };
 
+&iris {
+	firmware-name = "qcom/vpu/vpu36_p4_s7.mbn";
+
+	status = "okay";
+
+	video-firmware {
+		iommus = <&apps_smmu 0x19e2 0x0>;
+	};
+};
+
 &mdss {
 	status = "okay";
 };
@@ -728,13 +738,6 @@
 	vdda-pll-supply = <&vreg_l4f_e1_1p08>;
 
 	status = "okay";
-};
-
-&iris {
-    status = "okay";
-    video-firmware {
-    iommus = <&apps_smmu 0x19e2 0x0>;
-    };
 };
 
 &pcie3b {
