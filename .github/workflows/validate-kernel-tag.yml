@@ -71,12 +71,10 @@ jobs:
     permissions:
       checks: write
       contents: read
-      statuses: write
     env:
       VALIDATION_MODE: canonical-tag
       SUBJECT: ${{ inputs.tag }}
       REPOSITORY: ${{ github.repository }}
-      STATUS_CONTEXT: qcom-distro-images/canonical-tag
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - name: Checkout orchestration helpers
@@ -100,19 +98,22 @@ jobs:
           set -euo pipefail
           bash ./scripts/resolve-distro-validation-context.sh
 
-      # Leaves a red mark on the commit; without it a tag that fails to
-      # build reports nothing at all.
+      # Without this a tag that fails to build reports nothing at all. Created
+      # and concluded in one step, because there is no pending period to report.
       - name: Report kernel build failure
         if: ${{ needs.build.result != 'success' }}
         env:
           GH_TOKEN: ${{ github.token }}
           COMMIT_SHA: ${{ steps.context.outputs.head-sha }}
-          STATE: failure
-          DESCRIPTION: "Canonical kernel build failed before distro validation"
-          TARGET_URL: ${{ env.RUN_URL }}
+          REQUEST_ID: ${{ steps.context.outputs.request-id }}
+          KERNEL_BUILD_ID: ${{ steps.context.outputs.kernel-build-id }}
+          IMAGE_S3_PREFIX: qualcomm-linux/${{ steps.context.outputs.kernel-s3-prefix }}/${{ steps.context.outputs.kernel-build-id }}
+          DETAILS_URL: ${{ env.RUN_URL }}
+          CONCLUSION: failure
         run: |
           set -euo pipefail
-          bash ./scripts/report-distro-validation-status.sh
+          PHASE=start    bash ./scripts/report-distro-validation-check.sh
+          PHASE=complete bash ./scripts/report-distro-validation-check.sh
           exit 1
 
       - id: check
@@ -128,18 +129,6 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/report-distro-validation-check.sh
-
-      - name: Report validation pending
-        if: ${{ steps.check.outputs.should-dispatch == 'true' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          COMMIT_SHA: ${{ steps.context.outputs.head-sha }}
-          STATE: pending
-          DESCRIPTION: "Building Canonical server and desktop distro images"
-          TARGET_URL: ${{ env.RUN_URL }}
-        run: |
-          set -euo pipefail
-          bash ./scripts/report-distro-validation-status.sh
 
       - name: Dispatch trusted distro validation request
         if: ${{ steps.check.outputs.should-dispatch == 'true' }}

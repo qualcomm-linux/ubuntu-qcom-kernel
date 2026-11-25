@@ -149,11 +149,10 @@ jobs:
     needs: sync
     if: needs.sync.result == 'success' && needs.sync.outputs.synced_count != '0'
     # A called workflow's token can only be narrowed, never widened, so the
-    # Check Run and commit status it posts have to be granted here.
+    # Check Run it posts has to be granted here.
     permissions:
       checks: write
       contents: read
-      statuses: write
     uses: ./.github/workflows/validate-kernel-tag.yml # zizmor: ignore[self-repository]
     with:
       tag: ${{ needs.sync.outputs.synced_tag }}

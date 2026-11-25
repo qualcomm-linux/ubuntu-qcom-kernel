@@ -9,8 +9,7 @@ set -euo pipefail
 : "${STATE:?STATE is required}"
 : "${DESCRIPTION:?DESCRIPTION is required}"
 : "${TARGET_URL:?TARGET_URL is required}"
-
-STATUS_CONTEXT="${STATUS_CONTEXT:-qcom-distro-images/canonical-premerge}"
+: "${STATUS_CONTEXT:?STATUS_CONTEXT is required}"
 
 [[ "$REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo "::error::Invalid repository: ${REPOSITORY}" >&2; exit 1; }
 [[ "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Invalid commit SHA: ${COMMIT_SHA}" >&2; exit 1; }
