@@ -14,7 +14,8 @@ ubuntu-qcom-kernel
 │   │   ├── bootstrap-history.yml     ← one-time history seed
 │   │   ├── build-kernel.yml          ← build .deb packages (+ reusable workflow_call)
 │   │   ├── premerge-main.yml         ← pre-merge build check for PRs to main
-│   │   └── premerge-distro-validation.yml ← trusted distro image validation orchestrator
+│   │   ├── validate-kernel-tag.yml    ← build and validate one Canonical tag
+│   │   └── distro-validation.yml      ← trusted distro image validation orchestrator (all modes)
 │   ├── scripts/                      ← sync-mirror.sh, seed-history.sh (self-documenting)
 │   └── README.md
 │
@@ -84,7 +85,7 @@ build check (`premerge-main.yml`). It builds `resolute-qcom-devel` with the
 PR's `build-kernel.yml` and scripts, using `flavours=qcom` and `dbgsym=false`,
 and uploads nothing.
 
-After the pre-merge kernel workflow completes, `premerge-distro-validation.yml`
+After the pre-merge kernel workflow completes, `distro-validation.yml`
 runs from the trusted `main` branch through `workflow_run`. It resolves the PR
 from the triggering kernel run and, once a required reviewer of the
 `On Target Validation` environment approves the run, dispatches a validated

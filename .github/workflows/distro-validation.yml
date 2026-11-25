@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
-name: "Pre-merge distro image validation"
+name: "Distro image validation"
 
 on: # zizmor: ignore[dangerous-triggers]
   workflow_run:
@@ -19,7 +19,7 @@ permissions:
 
 concurrency:
   group: >-
-    premerge-distro-validation-${{
+    distro-validation-${{
       github.event_name == 'repository_dispatch' && 'callback' || 'request'
     }}-${{
       github.event.client_payload.subject ||
@@ -93,6 +93,7 @@ jobs:
           COMMIT_SHA: ${{ needs.workflow-context.outputs.head-sha }}
           STATE: pending
           DESCRIPTION: "Waiting for approval to build images and test on target"
+          STATUS_CONTEXT: qcom-distro-images/canonical-premerge
           TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -150,6 +151,7 @@ jobs:
           COMMIT_SHA: ${{ needs.workflow-context.outputs.head-sha }}
           STATE: pending
           DESCRIPTION: "Building Canonical server and desktop distro images"
+          STATUS_CONTEXT: qcom-distro-images/canonical-premerge
           TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -199,6 +201,7 @@ jobs:
           COMMIT_SHA: ${{ needs.workflow-context.outputs.head-sha }}
           STATE: failure
           DESCRIPTION: "Not approved to build images and test on target"
+          STATUS_CONTEXT: qcom-distro-images/canonical-premerge
           TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -231,6 +234,7 @@ jobs:
           COMMIT_SHA: ${{ needs.workflow-context.outputs.head-sha }}
           STATE: failure
           DESCRIPTION: "Canonical kernel build failed before distro validation"
+          STATUS_CONTEXT: qcom-distro-images/canonical-premerge
           TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -311,6 +315,7 @@ jobs:
           IMAGE_S3_PREFIX: ${{ needs.callback-context.outputs.image-s3-prefix }}
           STATE: ${{ needs.callback-context.outputs.state }}
           DESCRIPTION: ${{ needs.callback-context.outputs.description }}
+          STATUS_CONTEXT: qcom-distro-images/canonical-premerge
           TARGET_URL: ${{ needs.callback-context.outputs.distro-run-url }}
         run: |
           set -euo pipefail
@@ -328,5 +333,11 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           bash ./scripts/report-distro-validation-check.sh
-          bash ./scripts/report-distro-validation-status.sh
+
+          # Pre-merge also carries a commit status, because its awaiting-approval
+          # and not-approved states have no Check Run behind them. Every other
+          # mode publishes one object: the Check Run above.
+          if [[ "$VALIDATION_MODE" == "canonical-premerge" ]]; then
+            bash ./scripts/report-distro-validation-status.sh
+          fi
           [[ "$STATE" == "success" ]]
