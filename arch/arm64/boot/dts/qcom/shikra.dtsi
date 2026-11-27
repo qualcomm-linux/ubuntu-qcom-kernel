@@ -1792,8 +1792,8 @@
 			interconnect-names = "pcie-mem",
 					     "cpu-pcie";
 
-			iommu-map = <0x0 &apps_smmu 0x800 0x1>,
-				    <0x100 &apps_smmu 0x801 0x1>;
+			iommu-map = <0x0 &apps_smmu 0x800 0x0 0x1>,
+				    <0x100 &apps_smmu 0x801 0x0 0x1>;
 
 			resets = <&gcc GCC_PCIE_BCR>;
 			reset-names = "pci";
